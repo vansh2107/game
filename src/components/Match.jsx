@@ -203,7 +203,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     let endOfInnings = false;
 
     if (m.innings === 2 && nextScore >= m.target) matchEnded = true; 
-    if (nextWickets >= m.teamLists[m.battingTeam].length - 1 || nextOver >= m.totalOvers) endOfInnings = true;
+    if (nextWickets >= Math.max(1, m.teamLists[m.battingTeam].length - 1) || nextOver >= m.totalOvers) endOfInnings = true;
     if (m.innings === 2 && endOfInnings && nextScore < m.target) matchEnded = true;
 
     // MATCH OUTCOMES
@@ -328,6 +328,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     }, ENGINE_CONFIG.TURN_TIMER_SEC * 1000);
     return () => clearTimeout(timer);
   }, [matchData?.status, matchData?.overNumber]);
+
+  if (!matchData) return <div className="container center" style={{color:'white'}}>Loading Match State...</div>;
 
   const isMyTurnToBowl = matchData.currentBowlerId === currentUser.uid;
   const isMyTurnToBat = matchData.strikerId === currentUser.uid;
