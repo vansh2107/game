@@ -350,11 +350,24 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     await updateDoc(doc(db, 'matches', matchId), { fieldSettings: field });
   }
 
-  async function submitTossChoice(choice) {
-    const batFirst = choice === 'bat' ? matchData.tossWinnerTeam : (matchData.tossWinnerTeam === 'A' ? 'B' : 'A');
+  async function submitTossCall(call) {
+    // Called by Team A's captain — 'heads' or 'tails'
+    const coinResult = Math.random() > 0.5 ? 'heads' : 'tails';
+    const winnerTeam = coinResult === call ? matchData.tossCallerTeam : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
+    await updateDoc(doc(db, 'matches', matchId), {
+      tossCall: call,
+      tossCoinResult: coinResult,
+      tossWinnerTeam: winnerTeam,
+    });
+  }
+
+  async function submitTossChoice(choice, currentMatchData) {
+    // choice: 'bat' or 'bowl'. currentMatchData passed explicitly to avoid stale closure.
+    const m = currentMatchData || matchData;
+    const batFirst = choice === 'bat' ? m.tossWinnerTeam : (m.tossWinnerTeam === 'A' ? 'B' : 'A');
     const bowlFirst = batFirst === 'A' ? 'B' : 'A';
-    const teamAIds = matchData.teamLists.A;
-    const teamBIds = matchData.teamLists.B;
+    const teamAIds = m.teamLists.A;
+    const teamBIds = m.teamLists.B;
     await updateDoc(doc(db, 'matches', matchId), {
       status: 'in-progress',
       tossChoice: choice,
@@ -367,15 +380,42 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     });
   }
 
-  // Auto-resolve toss if toss winner captain is a bot
+  // Auto-resolve toss for bots — uses matchData from snapshot to avoid stale closure
   useEffect(() => {
-    if (!matchData || matchData.status !== 'toss' || !imHost) return;
-    const winnerCap = Object.values(lobbyData.players).find(p => p.team === matchData.tossWinnerTeam && p.isCaptain);
-    if (winnerCap?.isBot) {
-      const t = setTimeout(() => submitTossChoice('bat'), 1000);
-      return () => clearTimeout(t);
+    if (!matchData || !imHost) return;
+
+    // Phase 1: auto-call if Team A captain is a bot
+    if (matchData.status === 'toss' && !matchData.tossCall) {
+      const callerCap = Object.values(lobbyData.players).find(
+        p => p.team === matchData.tossCallerTeam && p.isCaptain
+      );
+      if (callerCap?.isBot) {
+        const coinResult = Math.random() > 0.5 ? 'heads' : 'tails';
+        const winnerTeam = coinResult === 'heads'
+          ? matchData.tossCallerTeam
+          : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
+        const t = setTimeout(() => {
+          updateDoc(doc(db, 'matches', matchId), {
+            tossCall: 'heads',
+            tossCoinResult: coinResult,
+            tossWinnerTeam: winnerTeam,
+          });
+        }, 800);
+        return () => clearTimeout(t);
+      }
     }
-  }, [matchData?.status]);
+
+    // Phase 2: auto-choose bat/bowl if winner captain is a bot
+    if (matchData.status === 'toss' && matchData.tossWinnerTeam && !matchData.tossChoice) {
+      const winnerCap = Object.values(lobbyData.players).find(
+        p => p.team === matchData.tossWinnerTeam && p.isCaptain
+      );
+      if (winnerCap?.isBot) {
+        const t = setTimeout(() => submitTossChoice('bat', matchData), 1000);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [matchData?.status, matchData?.tossCall, matchData?.tossWinnerTeam, matchData?.tossChoice]);
 
   // FIX: auto-set field for bot bowling captain OR when bowler is bot but captain is human
   // Also handles the bot_auto edge case by falling back to DEFAULT_FIELD
@@ -418,35 +458,77 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   // ── TOSS SCREEN ──────────────────────────────────────────────────────────────
   if (matchData.status === 'toss') {
+    const callerTeamName = matchData.tossCallerTeam === 'A' ? lobbyData.teamAName : lobbyData.teamBName;
+    const iAmCaller = !!Object.values(lobbyData.players).find(
+      p => p.uid === currentUser.uid && p.team === matchData.tossCallerTeam && p.isCaptain
+    );
+    const coinFlipped = !!matchData.tossCoinResult;
     const winnerTeamName = matchData.tossWinnerTeam === 'A' ? lobbyData.teamAName : lobbyData.teamBName;
     const iAmWinner = !!Object.values(lobbyData.players).find(
       p => p.uid === currentUser.uid && p.team === matchData.tossWinnerTeam && p.isCaptain
     );
-    const coinFace = matchData.tossWinnerTeam === 'A' ? 'Heads' : 'Tails';
+
     return (
       <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '24px', maxWidth: '480px' }}>
         <div style={{ background: 'var(--card-bg)', padding: '30px', borderRadius: '12px', width: '100%' }}>
           <div style={{ fontSize: '64px', marginBottom: '10px' }}>🪙</div>
-          <h2 style={{ margin: '0 0 6px' }}>The Toss</h2>
-          <p style={{ color: 'var(--text-secondary)', margin: '0 0 20px' }}>
-            The coin landed on <strong style={{ color: 'gold' }}>{coinFace}</strong>
-          </p>
-          <div style={{ background: 'rgba(255,255,255,0.06)', padding: '12px', borderRadius: '8px', marginBottom: '20px' }}>
-            <span style={{ color: 'gold', fontWeight: 'bold', fontSize: '18px' }}>{winnerTeamName}</span>
-            <span> wins the toss!</span>
-          </div>
-          {iAmWinner ? (
+          <h2 style={{ margin: '0 0 20px' }}>The Toss</h2>
+
+          {/* Phase 1 — caller picks heads or tails */}
+          {!coinFlipped && (
             <>
-              <p style={{ marginBottom: '14px' }}>Choose to bat or bowl first:</p>
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button onClick={() => submitTossChoice('bat')} className="button primary" style={{ flex: 1 }}>🏏 Bat First</button>
-                <button onClick={() => submitTossChoice('bowl')} className="button secondary" style={{ flex: 1 }}>🎳 Bowl First</button>
-              </div>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
+                <strong style={{ color: 'white' }}>{callerTeamName}</strong> captain calls the toss
+              </p>
+              {iAmCaller ? (
+                <>
+                  <p style={{ marginBottom: '14px' }}>Call it:</p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button onClick={() => submitTossCall('heads')} className="button primary" style={{ flex: 1, fontSize: '20px' }}>🪙 Heads</button>
+                    <button onClick={() => submitTossCall('tails')} className="button secondary" style={{ flex: 1, fontSize: '20px' }}>🔄 Tails</button>
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  Waiting for <strong style={{ color: 'white' }}>{callerTeamName}</strong> captain to call...
+                </p>
+              )}
             </>
-          ) : (
-            <p style={{ color: 'var(--text-secondary)' }}>
-              Waiting for <strong style={{ color: 'white' }}>{winnerTeamName}</strong> captain to choose...
-            </p>
+          )}
+
+          {/* Phase 2 — coin flipped, show result, winner chooses */}
+          {coinFlipped && (
+            <>
+              <div style={{ marginBottom: '16px' }}>
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  {callerTeamName} called <strong style={{ color: 'white', textTransform: 'capitalize' }}>{matchData.tossCall}</strong>
+                </p>
+                <p style={{ fontSize: '22px', marginBottom: '6px' }}>
+                  Coin landed on{' '}
+                  <strong style={{ color: matchData.tossCoinResult === matchData.tossCall ? 'var(--success-color)' : 'var(--error-color)', textTransform: 'capitalize' }}>
+                    {matchData.tossCoinResult}
+                  </strong>
+                </p>
+                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
+                  <span style={{ color: 'gold', fontWeight: 'bold', fontSize: '18px' }}>{winnerTeamName}</span>
+                  <span> wins the toss!</span>
+                </div>
+              </div>
+
+              {iAmWinner ? (
+                <>
+                  <p style={{ marginBottom: '14px' }}>Choose to bat or bowl first:</p>
+                  <div style={{ display: 'flex', gap: '12px' }}>
+                    <button onClick={() => submitTossChoice('bat', matchData)} className="button primary" style={{ flex: 1 }}>🏏 Bat First</button>
+                    <button onClick={() => submitTossChoice('bowl', matchData)} className="button secondary" style={{ flex: 1 }}>🎳 Bowl First</button>
+                  </div>
+                </>
+              ) : (
+                <p style={{ color: 'var(--text-secondary)' }}>
+                  Waiting for <strong style={{ color: 'white' }}>{winnerTeamName}</strong> captain to choose...
+                </p>
+              )}
+            </>
           )}
         </div>
         <button onClick={leaveLobby} className="button secondary" style={{ maxWidth: '160px' }}>Leave</button>

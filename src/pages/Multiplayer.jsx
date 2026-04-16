@@ -301,11 +301,15 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
     const teamBIds = teamB.map(p => p.uid);
     const tossWinnerTeam = Math.random() > 0.5 ? 'A' : 'B';
 
+    // Toss: Team A's captain always calls. Coin result revealed after call.
     await setDoc(doc(db, 'matches', lobbyId), {
       status: 'toss',
       matchVersion: ENGINE_CONFIG.VERSION,
-      tossWinnerTeam,
-      tossChoice: null,
+      tossCallerTeam: 'A',   // Team A captain makes the call
+      tossCall: null,         // 'heads' or 'tails' — set when caller picks
+      tossCoinResult: null,   // actual flip result — revealed after call
+      tossWinnerTeam: null,   // derived after flip
+      tossChoice: null,       // 'bat' or 'bowl' — set by winner
       totalOvers: lobbyData.overs,
       teamLists: { A: teamAIds, B: teamBIds },
       ballInput: { bowler: null, batsman: null },
