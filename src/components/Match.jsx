@@ -4,7 +4,7 @@ import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
 
 export const ENGINE_CONFIG = {
-  TURN_TIMER_SEC: 15,
+  TURN_TIMER_SEC: 30,
   ACCURACY_POOR_THRESHOLD: 0.2,
   ACCURACY_PERFECT_THRESHOLD: 0.8,
   VERSION: '1.0.0',
@@ -347,6 +347,11 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   }
 
   async function saveFieldSettings(field) {
+    // Only bowling captain can set the field
+    const isBowlingCaptain = !!Object.values(lobbyData.players).find(
+      p => p.uid === currentUser.uid && p.team === matchData.bowlingTeam && p.isCaptain
+    );
+    if (!isBowlingCaptain) return;
     await updateDoc(doc(db, 'matches', matchId), { fieldSettings: field });
   }
 
@@ -434,9 +439,10 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     if (!matchData || matchData.status !== 'over-break' || !imHost) return;
     const timer = setTimeout(() => {
       const roster = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
+      // Prefer someone who didn't bowl last over, but if no one else exists allow the same bowler
       const eligible = roster.filter(p => p.uid !== matchData.lastOverBowlerId);
-      // Prefer human, fall back to bot, fall back to first eligible regardless
-      const pick = eligible.find(p => !p.isBot) || eligible[0];
+      const pool = eligible.length > 0 ? eligible : roster;
+      const pick = pool.find(p => !p.isBot) || pool[0];
       if (pick) {
         updateDoc(doc(db, 'matches', matchId), { status: 'in-progress', currentBowlerId: pick.uid });
       }
@@ -577,7 +583,9 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   // ── OVER BREAK ────────────────────────────────────────────────────────────────
   if (matchData.status === 'over-break') {
     const roster = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
-    const eligibleBowlers = roster.filter(p => p.uid !== matchData.lastOverBowlerId);
+    const eligible = roster.filter(p => p.uid !== matchData.lastOverBowlerId);
+    // If only one bowler exists, allow them to bowl again
+    const eligibleBowlers = eligible.length > 0 ? eligible : roster;
     return (
       <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px' }}>
         <h2>Over Complete!</h2>
@@ -589,9 +597,6 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
               {eligibleBowlers.map(p => (
                 <button key={p.uid} onClick={() => submitNextBowler(p.uid)} className="button primary">{p.name}</button>
               ))}
-              {eligibleBowlers.length === 0 && (
-                <p style={{ color: 'orange' }}>No eligible bowlers — auto-selecting...</p>
-              )}
             </div>
           ) : (
             <p>Waiting for bowling captain to select the next bowler...</p>
@@ -616,12 +621,11 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         </div>
       </div>
 
-      {/* Field Placement */}
-      {/* FIX: key={fieldResetKey} forces FieldSetter to re-mount when field is externally reset */}
-      {!fieldIsSet && (amBowlingCaptain || imHost) && (
+      {/* Field Placement — only bowling captain can set */}
+      {!fieldIsSet && amBowlingCaptain && (
         <FieldSetter key="field-setter" current={null} onSave={saveFieldSettings} />
       )}
-      {!fieldIsSet && !amBowlingCaptain && !imHost && (
+      {!fieldIsSet && !amBowlingCaptain && (
         <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', textAlign: 'center', color: 'orange' }}>
           Waiting for bowling captain to set the field...
         </div>
@@ -634,7 +638,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
               {z.replace('-', ' ')}: <strong>{matchData.fieldSettings[z] || 0}</strong>
             </span>
           ))}
-          {(amBowlingCaptain || imHost) && (
+          {amBowlingCaptain && (
             <button
               onClick={() => updateDoc(doc(db, 'matches', matchId), { fieldSettings: null })}
               style={{ marginLeft: 'auto', fontSize: '12px', padding: '3px 10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
