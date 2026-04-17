@@ -15,6 +15,42 @@ export const ENGINE_CONFIG = {
 const ZONES = ['off', 'straight', 'leg', 'deep-off', 'deep-leg'];
 const DEFAULT_FIELD = { off: 3, straight: 2, leg: 2, 'deep-off': 1, 'deep-leg': 1 };
 
+// Random bot action generators
+function randomBowlingAction() {
+  const deliveryTypes = ['fast', 'spin', 'yorker', 'bouncer'];
+  const lines = ['off', 'middle', 'leg'];
+  return {
+    deliveryType: deliveryTypes[Math.floor(Math.random() * deliveryTypes.length)],
+    line: lines[Math.floor(Math.random() * lines.length)]
+  };
+}
+
+function randomBattingAction() {
+  const shotTypes = ['drive', 'pull', 'cut'];
+  const intents = ['attack', 'neutral', 'defend'];
+  const directions = ['off', 'straight', 'leg'];
+  const lofts = ['ground', 'lofted'];
+  return {
+    shotType: shotTypes[Math.floor(Math.random() * shotTypes.length)],
+    intent: intents[Math.floor(Math.random() * intents.length)],
+    direction: directions[Math.floor(Math.random() * directions.length)],
+    loft: lofts[Math.floor(Math.random() * lofts.length)]
+  };
+}
+
+function randomFieldSettings() {
+  // Generate varied field placements — not always the same
+  const presets = [
+    { off: 3, straight: 2, leg: 2, 'deep-off': 1, 'deep-leg': 1 }, // balanced
+    { off: 4, straight: 2, leg: 1, 'deep-off': 1, 'deep-leg': 1 }, // off-heavy
+    { off: 1, straight: 2, leg: 4, 'deep-off': 1, 'deep-leg': 1 }, // leg-heavy
+    { off: 2, straight: 3, leg: 2, 'deep-off': 1, 'deep-leg': 1 }, // straight-heavy
+    { off: 2, straight: 1, leg: 2, 'deep-off': 2, 'deep-leg': 2 }, // deep-heavy
+  ];
+  return presets[Math.floor(Math.random() * presets.length)];
+}
+
+
 // Maps shot direction + loft to the relevant field zone
 function checkFielder(fieldSettings, shotDirection, loft) {
   const field = fieldSettings || DEFAULT_FIELD;
@@ -121,8 +157,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   function forceTimeoutActions(m) {
     const updates = {};
-    if (!m.ballInput?.bowler) updates['ballInput.bowler'] = { deliveryType: 'fast', line: 'off' };
-    if (!m.ballInput?.batsman) updates['ballInput.batsman'] = { shotType: 'drive', intent: 'defend', direction: 'straight', loft: 'ground' };
+    if (!m.ballInput?.bowler) updates['ballInput.bowler'] = randomBowlingAction();
+    if (!m.ballInput?.batsman) updates['ballInput.batsman'] = randomBattingAction();
     if (Object.keys(updates).length > 0) updateDoc(doc(db, 'matches', matchId), updates);
   }
 
@@ -134,10 +170,10 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     const batIn = matchData.ballInput?.batsman;
     const t = setTimeout(() => {
       if (!bIn && matchData.currentBowlerId?.startsWith('bot_')) {
-        updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': { deliveryType: 'fast', line: 'off' } });
+        updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': randomBowlingAction() });
       }
       if (!batIn && matchData.strikerId?.startsWith('bot_')) {
-        updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': { shotType: 'drive', intent: 'neutral', direction: 'off', loft: 'ground' } });
+        updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': randomBattingAction() });
       }
     }, 800);
     return () => clearTimeout(t);
@@ -430,7 +466,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     const bowlingCap = Object.values(lobbyData.players).find(p => p.team === matchData.bowlingTeam && p.isCaptain);
     // Auto-set if captain is a bot, or if there's no human captain (bot_auto scenario)
     if (!bowlingCap || bowlingCap.isBot) {
-      updateDoc(doc(db, 'matches', matchId), { fieldSettings: { ...DEFAULT_FIELD } });
+      updateDoc(doc(db, 'matches', matchId), { fieldSettings: randomFieldSettings() });
     }
   }, [matchData?.status, matchData?.ballNumber, matchData?.overNumber, matchData?.innings, matchData?.fieldSettings]);
 
