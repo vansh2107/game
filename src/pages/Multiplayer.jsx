@@ -85,6 +85,7 @@ export default function Multiplayer() {
       const teamCountA = Object.values(data.players).filter(p => p.team === 'A').length;
       const teamCountB = Object.values(data.players).filter(p => p.team === 'B').length;
       const assignedTeam = teamCountA <= teamCountB ? 'A' : 'B';
+      const existingCap = Object.values(data.players).find(p => p.team === assignedTeam && p.isCaptain);
 
       await updateDoc(ref, {
         playerIds: [...data.playerIds, currentUser.uid],
@@ -93,7 +94,7 @@ export default function Multiplayer() {
           name: finalName,
           team: assignedTeam,
           isReady: false,
-          isCaptain: false,
+          isCaptain: !existingCap,
           isBot: false,
           joinedAt: Date.now()
         }
@@ -141,9 +142,11 @@ export default function Multiplayer() {
           updates.hostId = nextHost.uid;
         }
         if (me?.isCaptain) {
-          const teammates = humansLeft.filter(p => p.team === me.team);
-          if (teammates.length > 0) {
-            updates[`players.${teammates[0].uid}.isCaptain`] = true;
+          const teammates = Object.values(updatedPlayers).filter(p => p.team === me.team && p.uid !== currentUser.uid);
+          const humanTeammate = teammates.find(p => !p.isBot);
+          const newCap = humanTeammate || teammates[0];
+          if (newCap) {
+            updates[`players.${newCap.uid}.isCaptain`] = true;
           }
         }
         await updateDoc(ref, updates);
@@ -238,6 +241,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
   async function addBot(team) {
     if (!isHost) return;
     const botUid = 'bot_' + Math.random().toString(36).substring(2, 11);
+    const existingCap = Object.values(lobbyData.players || {}).find(p => p.team === team && p.isCaptain);
     await updateDoc(doc(db, 'lobbies', lobbyId), {
       playerIds: [...lobbyData.playerIds, botUid],
       [`players.${botUid}`]: {
@@ -245,7 +249,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
         name: `Bot ${Math.floor(Math.random() * 1000)}`,
         team,
         isReady: true,
-        isCaptain: false,
+        isCaptain: !existingCap,
         isBot: true,
         joinedAt: Date.now()
       }
@@ -260,8 +264,10 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
       playerIds: lobbyData.playerIds.filter(id => id !== uid)
     };
     if (target?.isCaptain) {
-      const teammates = playersArr.filter(p => p.team === target.team && p.uid !== uid && !p.isBot);
-      if (teammates.length > 0) updates[`players.${teammates[0].uid}.isCaptain`] = true;
+      const teammates = playersArr.filter(p => p.team === target.team && p.uid !== uid);
+      const humanTeammate = teammates.find(p => !p.isBot);
+      const newCap = humanTeammate || teammates[0];
+      if (newCap) updates[`players.${newCap.uid}.isCaptain`] = true;
     }
     await updateDoc(doc(db, 'lobbies', lobbyId), updates);
   }

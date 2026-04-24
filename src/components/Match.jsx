@@ -660,16 +660,18 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     }
   }, [matchData?.status, matchData?.tossCall, matchData?.tossWinnerTeam, matchData?.tossChoice]);
 
-  // FIX: auto-set field for bot bowler
+  // FIX: auto-set field for bot captain
   useEffect(() => {
     if (!matchData || !imHost || matchData.status !== 'in-progress') return;
     if (matchData.fieldSettings) return;
-    const currentBowler = lobbyData.players?.[matchData.currentBowlerId];
-    // Auto-set if the current bowler is a bot
-    if (!currentBowler || currentBowler.isBot || matchData.currentBowlerId?.startsWith('bot_')) {
+    
+    const bowlCap = Object.values(lobbyData.players).find(p => p.team === matchData.bowlingTeam && p.isCaptain);
+    
+    // Auto-set if the bowling captain is a bot
+    if (bowlCap?.isBot) {
       updateDoc(doc(db, 'matches', matchId), { fieldSettings: randomFieldSettings() });
     }
-  }, [matchData?.status, matchData?.ballNumber, matchData?.overNumber, matchData?.innings, matchData?.fieldSettings, matchData?.currentBowlerId]);
+  }, [matchData?.status, matchData?.ballNumber, matchData?.overNumber, matchData?.innings, matchData?.fieldSettings, matchData?.bowlingTeam]);
 
   // Setup completion transition
   useEffect(() => {
@@ -686,24 +688,44 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   // SETUP TIMEOUT and AUTO-BOT logic — prevents soft-lock if captains are AFK or bots
   useEffect(() => {
     if (!matchData || matchData.status !== 'setup' || !imHost) return;
-    const timer = setTimeout(() => {
+
+    const bowlCap = Object.values(lobbyData.players).find(p => p.team === matchData.bowlingTeam && p.isCaptain);
+    const batCap = Object.values(lobbyData.players).find(p => p.team === matchData.battingTeam && p.isCaptain);
+
+    let bowlTimer = null;
+    let batTimer = null;
+
+    if (!matchData.currentBowlerId) {
+      const delay = bowlCap?.isBot ? 1000 : ENGINE_CONFIG.TURN_TIMER_SEC * 1000;
+      bowlTimer = setTimeout(() => {
+        const roBowl = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
+        const eligibleB = roBowl.filter(p => p.uid !== matchData.lastOverBowlerId);
+        const picked = (eligibleB.length > 0 ? eligibleB : roBowl)[0]?.uid || matchData.teamLists[matchData.bowlingTeam][0];
+        updateDoc(doc(db, 'matches', matchId), { currentBowlerId: picked });
+      }, delay);
+    }
+
+    const needsBatsman = !matchData.strikerId || (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1);
+    if (needsBatsman) {
+      const delay = batCap?.isBot ? 1000 : ENGINE_CONFIG.TURN_TIMER_SEC * 1000;
+      batTimer = setTimeout(() => {
         const updates = {};
-        if (!matchData.currentBowlerId) {
-            const roBowl = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
-            const eligibleB = roBowl.filter(p => p.uid !== matchData.lastOverBowlerId);
-            updates.currentBowlerId = (eligibleB.length > 0 ? eligibleB : roBowl)[0]?.uid || matchData.teamLists[matchData.bowlingTeam][0];
-        }
         if (!matchData.strikerId) {
-            const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.nonStrikerId);
-            if (avail.length > 0) updates.strikerId = avail[0];
+          const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.nonStrikerId);
+          if (avail.length > 0) updates.strikerId = avail[0];
         }
         if (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1) {
-            const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.strikerId && id !== updates.strikerId);
-            if (avail.length > 0) updates.nonStrikerId = avail[0];
+          const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.strikerId && id !== updates.strikerId);
+          if (avail.length > 0) updates.nonStrikerId = avail[0];
         }
         if (Object.keys(updates).length > 0) updateDoc(doc(db, 'matches', matchId), updates);
-    }, ENGINE_CONFIG.TURN_TIMER_SEC * 1000);
-    return () => clearTimeout(timer);
+      }, delay);
+    }
+
+    return () => {
+      if (bowlTimer) clearTimeout(bowlTimer);
+      if (batTimer) clearTimeout(batTimer);
+    };
   }, [matchData?.status, matchData?.strikerId, matchData?.nonStrikerId, matchData?.currentBowlerId]);
 
   if (!matchData) return <div className="container center" style={{ color: 'white' }}>Loading Match...</div>;
