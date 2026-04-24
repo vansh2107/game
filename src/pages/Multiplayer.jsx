@@ -36,6 +36,7 @@ export default function Multiplayer() {
         hostId: currentUser.uid,
         status: 'waiting',
         overs: 5,
+        lastManStand: false,
         teamAName: 'Team A',
         teamBName: 'Team B',
         messages: [],
@@ -229,6 +230,11 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
     await updateDoc(doc(db, 'lobbies', lobbyId), { overs: parseInt(e.target.value) });
   }
 
+  async function toggleLastManStand() {
+    if (!isHost) return;
+    await updateDoc(doc(db, 'lobbies', lobbyId), { lastManStand: !lobbyData.lastManStand });
+  }
+
   async function addBot(team) {
     if (!isHost) return;
     const botUid = 'bot_' + Math.random().toString(36).substring(2, 11);
@@ -311,6 +317,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
       tossWinnerTeam: null,   // derived after flip
       tossChoice: null,       // 'bat' or 'bowl' — set by winner
       totalOvers: lobbyData.overs,
+      lastManStand: !!lobbyData.lastManStand,
       teamLists: { A: teamAIds, B: teamBIds },
       ballInput: { bowler: null, batsman: null },
       history: [],
@@ -396,14 +403,18 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
             <option value="10">10</option>
             <option value="20">20</option>
           </select>
-          <button onClick={() => addBot('A')} className="button secondary" style={{ width: 'auto', padding: '5px 10px' }}>+ Bot A</button>
+          <label style={{ display: 'flex', alignItems: 'center', gap: '5px', marginLeft: '5px' }}>
+            <input type="checkbox" checked={!!lobbyData.lastManStand} onChange={toggleLastManStand} />
+            Last Man Stand
+          </label>
+          <button onClick={() => addBot('A')} className="button secondary" style={{ width: 'auto', padding: '5px 10px', marginLeft: 'auto' }}>+ Bot A</button>
           <button onClick={() => addBot('B')} className="button secondary" style={{ width: 'auto', padding: '5px 10px' }}>+ Bot B</button>
           {!isValidTeams && <span style={{ color: 'orange', fontSize: '12px' }}>Teams unbalanced!</span>}
         </div>
       )}
 
       {/* Teams + Chat */}
-      <div style={{ display: 'flex', gap: '20px', flex: 1 }}>
+      <div className="flex-row-responsive" style={{ flex: 1 }}>
         {/* Team A */}
         <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', minHeight: '300px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid gray', paddingBottom: '10px', marginBottom: '10px' }}>

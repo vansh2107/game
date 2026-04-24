@@ -15,9 +15,80 @@ export const ENGINE_CONFIG = {
 const ZONES = ['off', 'straight', 'leg', 'deep-off', 'deep-leg'];
 const DEFAULT_FIELD = { off: 3, straight: 3, leg: 2, 'deep-off': 1, 'deep-leg': 1 };
 
+const SHOT_VISUALS = {
+  'drive': { icon: '🏏', bgColor: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', label: 'Classic Drive' },
+  'cover drive': { icon: '✨🏏', bgColor: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', label: 'Elegant Cover Drive' },
+  'straight drive': { icon: '🎯🏏', bgColor: 'linear-gradient(135deg, #2980b9 0%, #6dd5fa 100%)', label: 'Straight Drive' },
+  'pull': { icon: '🌪️🏏', bgColor: 'linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%)', label: 'Aggressive Pull' },
+  'cut': { icon: '⚔️🏏', bgColor: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)', label: 'Late Cut' },
+  'sweep': { icon: '🧹🏏', bgColor: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', label: 'Sweep Shot' },
+  'scoop': { icon: '🥄🏏', bgColor: 'linear-gradient(135deg, #8A2387 0%, #E94057 100%)', label: 'Ramp / Scoop' },
+  'helicopter shot': { icon: '🚁🏏', bgColor: 'linear-gradient(135deg, #00C9FF 0%, #92FE9D 100%)', label: 'Helicopter Shot' },
+};
+
+const BOWLING_VISUALS = {
+  'fast': { icon: '🔥🥎', bgColor: 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)', label: 'Pace Delivery' },
+  'spin': { icon: '🌀🥎', bgColor: 'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)', label: 'Spin Delivery' },
+  'yorker': { icon: '🎯🥎', bgColor: 'linear-gradient(135deg, #FDC830 0%, #F37335 100%)', label: 'Toe-Crushing Yorker' },
+  'bouncer': { icon: '🚀🥎', bgColor: 'linear-gradient(135deg, #141E30 0%, #243B55 100%)', label: 'Aggressive Bouncer' },
+};
+
+function ActionCinematicPanel({ type, choiceObj, isSubmitted }) {
+  if (!choiceObj) return null;
+  let data;
+  if (type === 'batting') {
+    const visual = SHOT_VISUALS[choiceObj.shotType] || SHOT_VISUALS['drive'];
+    data = {
+      title: isSubmitted ? 'Shot Locked In!' : 'Shot Selection Preview',
+      icon: visual.icon,
+      bg: visual.bgColor,
+      mainText: visual.label,
+      subText: `Intent: ${choiceObj.intent.toUpperCase()} | Direction: ${choiceObj.direction.toUpperCase()} | Loft: ${choiceObj.loft.toUpperCase()}`
+    };
+  } else {
+    const visual = BOWLING_VISUALS[choiceObj.deliveryType] || BOWLING_VISUALS['fast'];
+    data = {
+      title: isSubmitted ? 'Delivery Locked In!' : 'Delivery Selection Preview',
+      icon: visual.icon,
+      bg: visual.bgColor,
+      mainText: visual.label,
+      subText: `Line: ${choiceObj.line.toUpperCase()}`
+    };
+  }
+
+  return (
+    <div style={{
+      width: '100%',
+      padding: '20px',
+      borderRadius: '12px',
+      background: data.bg,
+      color: 'white',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '20px',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+      position: 'relative',
+      overflow: 'hidden',
+      transition: 'all 0.3s ease'
+    }}>
+      <div style={{ fontSize: '54px', zIndex: 2, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))' }}>{data.icon}</div>
+      <div style={{ zIndex: 2, textAlign: 'left' }}>
+        <p style={{ margin: '0 0 5px 0', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.8 }}>{data.title}</p>
+        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{data.mainText}</h2>
+        <p style={{ margin: 0, fontSize: '13px', background: 'rgba(0,0,0,0.3)', padding: '5px 10px', borderRadius: '4px', display: 'inline-block' }}>{data.subText}</p>
+      </div>
+      <div style={{
+         position: 'absolute', top: '-10%', right: '-4%', fontSize: '140px', opacity: 0.1, zIndex: 1, transform: 'rotate(-15deg)', pointerEvents: 'none'
+      }}>
+        {data.icon.replace(/[^🥎🏏]/g, '') || data.icon.substring(0, 2)}
+      </div>
+    </div>
+  );
+}
+
 // Random bot action generators
-function randomBowlingAction(style) {
-  const deliveryTypes = style === 'spin' ? ['spin', 'yorker'] : ['fast', 'yorker', 'bouncer'];
+function randomBowlingAction() {
+  const deliveryTypes = ['fast', 'spin', 'yorker', 'bouncer'];
   const lines = ['off', 'middle', 'leg'];
   return {
     deliveryType: deliveryTypes[Math.floor(Math.random() * deliveryTypes.length)],
@@ -195,7 +266,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         updates.fieldSettings = randomFieldSettings();
     } else {
         // If field is set, default to random shots
-        if (!m.ballInput?.bowler) updates['ballInput.bowler'] = randomBowlingAction(m.currentBowlerStyle);
+        if (!m.ballInput?.bowler) updates['ballInput.bowler'] = randomBowlingAction();
         if (!m.ballInput?.batsman) updates['ballInput.batsman'] = randomBattingAction();
     }
     if (Object.keys(updates).length > 0) updateDoc(doc(db, 'matches', matchId), updates);
@@ -209,7 +280,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     const batIn = matchData.ballInput?.batsman;
     const t = setTimeout(() => {
       if (!bIn && matchData.currentBowlerId?.startsWith('bot_')) {
-        updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': randomBowlingAction(matchData.currentBowlerStyle) });
+        updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': randomBowlingAction() });
       }
       if (!batIn && matchData.strikerId?.startsWith('bot_')) {
         updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': randomBattingAction() });
@@ -276,42 +347,42 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       (batIn.shotType === 'scoop' && (bowlerIn.deliveryType === 'spin' || bowlerIn.deliveryType === 'yorker'));
 
     // Base probabilities for wickets
-    let edgeProb = 0.02;
-    let lbwProb = 0.02;
-    let bowledProb = 0.02;
-    let caughtProb = 0.02;
-    let runOutProb = hasFielder ? 0.05 : 0.01;
+    let edgeProb = 0.01;
+    let lbwProb = 0.01;
+    let bowledProb = 0.01;
+    let caughtProb = 0.01;
+    let runOutProb = hasFielder ? 0.03 : 0.01;
 
     // Modifiers based on delivery and shot
     if (accuracy === 'perfect') {
-      edgeProb += 0.15;
-      bowledProb += 0.10;
-      lbwProb += 0.10;
+      edgeProb += 0.08;
+      bowledProb += 0.06;
+      lbwProb += 0.06;
     }
 
     if (isCrossBatted) {
-      edgeProb += 0.20;
-      lbwProb += 0.15;
-      bowledProb += 0.10;
+      edgeProb += 0.10;
+      lbwProb += 0.08;
+      bowledProb += 0.06;
     }
 
     if (isShotMismatched) {
-      edgeProb += 0.15;
-      caughtProb += 0.20;
+      edgeProb += 0.08;
+      caughtProb += 0.12;
     }
 
     if (batIn.intent === 'defend') {
       edgeProb *= 0.3;
       caughtProb *= 0; 
       if (accuracy === 'perfect' && bowlerIn.deliveryType === 'yorker') {
-        bowledProb += 0.25;
-        lbwProb += 0.15;
+        bowledProb += 0.15;
+        lbwProb += 0.08;
       }
     } else if (batIn.intent === 'attack') {
-      edgeProb += 0.10;
-      bowledProb += 0.10;
+      edgeProb += 0.05;
+      bowledProb += 0.05;
       if (bowlerIn.deliveryType === 'spin' && !lineMatch) {
-         caughtProb += 0.15;
+         caughtProb += 0.08;
       }
     }
 
@@ -329,7 +400,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
        isWicket = true; wicketType = 'lbw'; commentary = 'Struck on the pads right in front! Plumb LBW.';
     } else if (randWicket < bowledProb + lbwProb + edgeProb) {
        isWicket = true; wicketType = 'caught'; commentary = 'Finds the outside edge... safely taken by the keeper!';
-    } else if (batIn.loft === 'lofted' && hasFielder && Math.random() < 0.4 + caughtProb) {
+    } else if (batIn.loft === 'lofted' && hasFielder && Math.random() < 0.25 + caughtProb) {
        isWicket = true; wicketType = 'caught'; commentary = 'Lofted straight down the throat of the fielder! CAUGHT!';
     }
 
@@ -409,9 +480,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     if (isWicket) nextOutPlayers.push(m.strikerId);
 
     // FIX: evaluate endOfInnings before matchEnded so both can't conflict
-    const endOfInnings =
-      nextWickets >= Math.max(1, m.teamLists[m.battingTeam].length - 1) ||
-      nextOver >= m.totalOvers;
+    const maxWickets = m.lastManStand ? m.teamLists[m.battingTeam].length : Math.max(1, m.teamLists[m.battingTeam].length - 1);
+    const endOfInnings = nextWickets >= maxWickets || nextOver >= m.totalOvers;
 
     // FIX: tie is when innings 2 ends with scores level, not score math on target
     const chaseSucceeded = m.innings === 2 && nextScore >= m.target;
@@ -519,8 +589,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   }
 
   async function saveFieldSettings(field) {
-    // Only the current bowler sets the field
-    if (matchData.currentBowlerId !== currentUser.uid) return;
+    // Only the bowling captain sets the field
+    if (!amBowlingCaptain) return;
     await updateDoc(doc(db, 'matches', matchId), { fieldSettings: field });
   }
 
@@ -605,7 +675,9 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   useEffect(() => {
     if (!matchData || !imHost || matchData.status !== 'setup') return;
     const teamSize = matchData.teamLists[matchData.battingTeam].length;
-    const needsNonStriker = teamSize > 1 && !matchData.nonStrikerId;
+    const outCount = matchData.outPlayers?.length || 0;
+    const lastManStanding = matchData.lastManStand && (teamSize - outCount <= 1);
+    const needsNonStriker = (teamSize > 1 && !matchData.nonStrikerId && !lastManStanding);
     if (matchData.currentBowlerId && matchData.strikerId && !needsNonStriker) {
        updateDoc(doc(db, 'matches', matchId), { status: 'in-progress', setupReason: null });
     }
@@ -620,7 +692,6 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
             const roBowl = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
             const eligibleB = roBowl.filter(p => p.uid !== matchData.lastOverBowlerId);
             updates.currentBowlerId = (eligibleB.length > 0 ? eligibleB : roBowl)[0]?.uid || matchData.teamLists[matchData.bowlingTeam][0];
-            updates.currentBowlerStyle = Math.random() < 0.5 ? 'pace' : 'spin';
         }
         if (!matchData.strikerId) {
             const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.nonStrikerId);
@@ -737,7 +808,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       const winningTeam = battingWon ? matchData.battingTeam : matchData.bowlingTeam;
       const winningTeamName = winningTeam === 'A' ? lobbyData.teamAName : lobbyData.teamBName;
       if (battingWon) {
-        const wicketsLeft = matchData.teamLists[winningTeam].length - 1 - matchData.wickets;
+        const maxWicketsWin = matchData.lastManStand ? matchData.teamLists[winningTeam].length : Math.max(1, matchData.teamLists[winningTeam].length - 1);
+        const wicketsLeft = maxWicketsWin - matchData.wickets;
         resultLine = `${winningTeamName} won by ${wicketsLeft} wicket${wicketsLeft !== 1 ? 's' : ''}!`;
       } else {
         const runMargin = matchData.target - 1 - matchData.score;
@@ -786,26 +858,25 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
     async function pickStriker(uid) { await updateDoc(doc(db, 'matches', matchId), { strikerId: uid }); }
     async function pickNonStriker(uid) { await updateDoc(doc(db, 'matches', matchId), { nonStrikerId: uid }); }
-    async function pickBowler(uid, style) { await updateDoc(doc(db, 'matches', matchId), { currentBowlerId: uid, currentBowlerStyle: style }); }
+    async function pickBowler(uid) { await updateDoc(doc(db, 'matches', matchId), { currentBowlerId: uid }); }
 
     return (
       <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '800px' }}>
         <h2>{title}</h2>
         <p>Score: {matchData.score} / {matchData.wickets}</p>
         
-        <div style={{ display: 'flex', gap: '20px', flexWrap: 'wrap', justifyContent: 'center', width: '100%' }}>
+        <div className="flex-row-responsive" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
           
           {/* Bowling Selection */}
           {!matchData.currentBowlerId && (
              <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', flex: '1 1 300px' }}>
                <h3 style={{ color: 'var(--primary-color)' }}>Select Bowler</h3>
-               {amBowlingCaptain || imHost ? (
+               {amBowlingCaptain ? (
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                    {bowlPool.map(p => (
                      <div key={p.uid} style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
                        <span style={{flex: 1}}>{p.name}</span>
-                       <button onClick={() => pickBowler(p.uid, 'pace')} className="button secondary" style={{padding: '5px 10px'}}>Pace</button>
-                       <button onClick={() => pickBowler(p.uid, 'spin')} className="button secondary" style={{padding: '5px 10px'}}>Spin</button>
+                       <button onClick={() => pickBowler(p.uid)} className="button primary" style={{padding: '5px 10px'}}>Select</button>
                      </div>
                    ))}
                  </div>
@@ -816,16 +887,16 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
           )}
 
           {/* Batting Selection (New Striker/Openers) */}
-          {(!matchData.strikerId || (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1)) && (
+          {(!matchData.strikerId || (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1 && !(matchData.lastManStand && matchData.teamLists[matchData.battingTeam].length - (matchData.outPlayers?.length || 0) <= 1))) && (
              <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', flex: '1 1 300px' }}>
                <h3 style={{ color: 'gold' }}>Select Batsmen</h3>
-               {amBattingCaptain || imHost ? (
+               {amBattingCaptain ? (
                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                    {!matchData.strikerId && <p style={{ margin: '5px 0' }}>Pick Striker:</p>}
                    {!matchData.strikerId && availBatsmen.filter(p => p.uid !== matchData.nonStrikerId).map(p => (
                      <button key={p.uid} onClick={() => pickStriker(p.uid)} className="button primary">{p.name}</button>
                    ))}
-                   {matchData.strikerId && !matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1 && (
+                   {matchData.strikerId && !matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1 && !(matchData.lastManStand && matchData.teamLists[matchData.battingTeam].length - (matchData.outPlayers?.length || 0) <= 1) && (
                       <>
                         <p style={{ margin: '5px 0' }}>Pick Non-Striker:</p>
                         {availBatsmen.filter(p => p.uid !== matchData.strikerId).map(p => (
@@ -860,13 +931,13 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         </div>
       </div>
 
-      {/* Field Placement — only bowler can set */}
-      {!fieldIsSet && isMyTurnToBowl && (
+      {/* Field Placement — only captain can set */}
+      {!fieldIsSet && amBowlingCaptain && (
         <FieldSetter key="field-setter" current={null} onSave={saveFieldSettings} />
       )}
-      {!fieldIsSet && !isMyTurnToBowl && (
+      {!fieldIsSet && !amBowlingCaptain && (
         <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', textAlign: 'center', color: 'orange' }}>
-          Waiting for bowler to set the field...
+          Waiting for bowling captain to set the field...
         </div>
       )}
       {fieldIsSet && (
@@ -877,7 +948,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
               {z.replace('-', ' ')}: <strong>{matchData.fieldSettings[z] || 0}</strong>
             </span>
           ))}
-          {isMyTurnToBowl && (
+          {amBowlingCaptain && (
             <button
               onClick={() => updateDoc(doc(db, 'matches', matchId), { fieldSettings: null })}
               style={{ marginLeft: 'auto', fontSize: '12px', padding: '3px 10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
@@ -888,12 +959,12 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: '20px' }}>
+      <div className="flex-row-responsive">
         {/* Bowler Panel */}
         <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>
           <h3>Bowling</h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-            Bowler: <strong style={{ color: 'white' }}>{bowlerName} ({matchData.currentBowlerStyle === 'spin' ? 'Spin' : 'Pace'})</strong>
+            Bowler: <strong style={{ color: 'white' }}>{bowlerName}</strong>
           </p>
           {matchData.ballInput?.bowler ? (
             <p style={{ color: 'var(--success-color)' }}>✓ Delivery Locked In</p>
@@ -902,18 +973,10 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
           ) : isMyTurnToBowl ? (
             <form onSubmit={submitBowlingAction} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <select value={deliveryType} onChange={e => setDeliveryType(e.target.value)} className="input">
-                {matchData.currentBowlerStyle === 'spin' ? (
-                  <>
-                    <option value="spin">Spin</option>
-                    <option value="yorker">Yorker</option>
-                  </>
-                ) : (
-                  <>
-                    <option value="fast">Fast</option>
-                    <option value="yorker">Yorker</option>
-                    <option value="bouncer">Bouncer</option>
-                  </>
-                )}
+                <option value="fast">Fast</option>
+                <option value="spin">Spin</option>
+                <option value="yorker">Yorker</option>
+                <option value="bouncer">Bouncer</option>
               </select>
               <select value={line} onChange={e => setLine(e.target.value)} className="input">
                 <option value="off">Off</option>
@@ -933,7 +996,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>
           <h3>Batting</h3>
           <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-            On Strike: <strong style={{ color: 'white' }}>{strikerName}</strong> | <span style={{ color: 'gold' }}>Facing: {matchData.currentBowlerStyle === 'spin' ? 'Spin' : 'Pace'}</span>
+            On Strike: <strong style={{ color: 'white' }}>{strikerName}</strong>
           </p>
           {matchData.ballInput?.batsman ? (
             <p style={{ color: 'var(--success-color)' }}>✓ Shot Locked In</p>
@@ -974,6 +1037,19 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
           )}
         </div>
       </div>
+
+      {/* Cinematic Preview Panel */}
+      {(isMyTurnToBat || isMyTurnToBowl) && fieldIsSet && !matchData.processingResult && (
+        <ActionCinematicPanel 
+          type={isMyTurnToBat ? 'batting' : 'bowling'}
+          choiceObj={
+            isMyTurnToBat 
+              ? (matchData.ballInput?.batsman || { shotType, intent, direction: batsmanDirection, loft: batsmanLoft })
+              : (matchData.ballInput?.bowler || { deliveryType, line })
+          }
+          isSubmitted={isMyTurnToBat ? !!matchData.ballInput?.batsman : !!matchData.ballInput?.bowler}
+        />
+      )}
 
       {/* Commentary */}
       <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>

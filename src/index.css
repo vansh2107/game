@@ -156,6 +156,85 @@ body {
   padding: 10px;
   border-radius: 6px;
   margin-bottom: 16px;
-  font-size: 14px;
+  font-size: clamp(12px, 2vw, 14px);
   text-align: center;
 }
+
+/* ========================================================= */
+/*                   RESPONSIVE DESIGN                       */
+/* ========================================================= */
+
+:root {
+  --base-fs: clamp(14px, 1.5vw + 10px, 18px);
+  --title-fs: clamp(20px, 2.5vw + 12px, 32px);
+  --scale-factor: 1;
+}
+
+body {
+  font-size: var(--base-fs);
+}
+
+.title {
+  font-size: var(--title-fs);
+}
+
+/* Base structural layout for Safe Areas (Notches/Bottom bars) */
+.container {
+  padding: env(safe-area-inset-top, 20px) env(safe-area-inset-right, 20px) env(safe-area-inset-bottom, 20px) env(safe-area-inset-left, 20px);
+  padding-bottom: calc(env(safe-area-inset-bottom, 20px) + 20px);
+}
+
+/* Tap Target Mins & Scaling */
+.button, .input, button, input, select {
+  min-height: 48px; /* 48px minimum touch target for mobile */
+  font-size: var(--base-fs);
+}
+
+/* Dynamic Flex Utility Classes for Panels */
+.flex-row-responsive {
+  display: flex;
+  flex-direction: row;
+  gap: 20px;
+  width: 100%;
+}
+
+@media (max-width: 768px) {
+  /* Scale down spacing on phones and tablets */
+  .container {
+    padding: 10px;
+  }
+  
+  .card {
+    padding: 20px;
+  }
+  
+  .flex-row-responsive {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  /* Reduce sizes for the Match setup panels or cinematic headers to fit strictly inside ports */
+  h1 { font-size: clamp(22px, 5vw, 32px) !important; }
+  h2 { font-size: clamp(18px, 4vw, 24px) !important; }
+  h3 { font-size: clamp(16px, 3vw, 20px) !important; }
+}
+
+@media (max-width: 480px) {
+  /* Phones Portrait */
+  .flex-row-responsive > div {
+    flex: 1 1 100% !important;
+  }
+}
+
+/* Landscape Phones specifically */
+@media screen and (min-width: 480px) and (max-width: 900px) and (orientation: landscape) {
+  .flex-row-responsive {
+    flex-direction: row;
+  }
+  .container {
+    padding-top: max(env(safe-area-inset-top, 10px), 10px);
+    padding-bottom: max(env(safe-area-inset-bottom, 10px), 10px);
+  }
+  .card { padding: 15px; }
+}
+
