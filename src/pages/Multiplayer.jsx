@@ -355,7 +355,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
         {(isHost || p.uid === currentUser.uid) && !isAllReady && (
           <button style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => assignTeam(p.uid, p.team === 'A' ? 'B' : 'A')}>Swap</button>
         )}
-        {isHost && !p.isCaptain && !p.isBot && (
+        {isHost && !p.isCaptain && (
           <button style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => makeCaptain(p.uid, p.team)}>Make Cap</button>
         )}
         {isHost && p.uid !== currentUser.uid && (
