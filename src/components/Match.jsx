@@ -611,25 +611,40 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   }
 
   async function submitTossCall(call) {
-    const coin   = Math.random() > 0.5 ? 'heads' : 'tails';
-    const winner = coin === call ? matchData.tossCallerTeam : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
-    await updateDoc(doc(db, 'matches', matchId), { tossCall: call, tossCoinResult: coin, tossWinnerTeam: winner });
+    try {
+      const coin   = Math.random() > 0.5 ? 'heads' : 'tails';
+      const winner = coin === call ? matchData.tossCallerTeam : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
+      await updateDoc(doc(db, 'matches', matchId), { tossCall: call, tossCoinResult: coin, tossWinnerTeam: winner });
+    } catch (err) {
+      console.error("Toss call failed:", err);
+      alert("Failed to submit toss call: " + err.message);
+    }
   }
 
   async function submitTossChoice(choice, m) {
-    const md = m || matchData;
-    const batFirst  = choice === 'bat' ? md.tossWinnerTeam : (md.tossWinnerTeam === 'A' ? 'B' : 'A');
-    const bowlFirst = batFirst === 'A' ? 'B' : 'A';
-    const aIds = md.teamLists.A, bIds = md.teamLists.B;
-    await updateDoc(doc(db, 'matches', matchId), {
-      status: 'in-progress', tossChoice: choice, innings: 1,
-      battingTeam: batFirst, bowlingTeam: bowlFirst,
-      score: 0, wickets: 0, target: null, ballNumber: 0, overNumber: 0,
-      strikerId:    batFirst === 'A' ? aIds[0] : bIds[0],
-      nonStrikerId: batFirst === 'A' ? (aIds.length > 1 ? aIds[1] : null) : (bIds.length > 1 ? bIds[1] : null),
-      currentBowlerId: bowlFirst === 'A' ? aIds[0] : bIds[0],
-      playerStats: {},
-    });
+    try {
+      const md = m || matchData;
+      if (!md?.teamLists) throw new Error("Match data incomplete (teamLists missing)");
+      
+      const batFirst  = choice === 'bat' ? md.tossWinnerTeam : (md.tossWinnerTeam === 'A' ? 'B' : 'A');
+      const bowlFirst = batFirst === 'A' ? 'B' : 'A';
+      const aIds = md.teamLists.A || [], bIds = md.teamLists.B || [];
+      
+      if (!aIds.length || !bIds.length) throw new Error("Teams are empty");
+
+      await updateDoc(doc(db, 'matches', matchId), {
+        status: 'in-progress', tossChoice: choice, innings: 1,
+        battingTeam: batFirst, bowlingTeam: bowlFirst,
+        score: 0, wickets: 0, target: null, ballNumber: 0, overNumber: 0,
+        strikerId:    batFirst === 'A' ? aIds[0] : bIds[0],
+        nonStrikerId: batFirst === 'A' ? (aIds.length > 1 ? aIds[1] : null) : (bIds.length > 1 ? bIds[1] : null),
+        currentBowlerId: bowlFirst === 'A' ? aIds[0] : bIds[0],
+        playerStats: {},
+      });
+    } catch (err) {
+      console.error("Toss choice failed:", err);
+      alert("Failed to submit toss choice: " + err.message);
+    }
   }
 
   if (!matchData) return <div className="container center" style={{ color: 'white' }}>Loading Match...</div>;
@@ -657,11 +672,23 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   // ── TOSS ─────────────────────────────────────────────────────────────────────
   if (matchData.status === 'toss') {
+    const players = Object.values(lobbyData.players || {});
     const callerName = matchData.tossCallerTeam === 'A' ? teamAName : teamBName;
-    const iAmCaller  = !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.tossCallerTeam && p.isCaptain);
+    
+    // Fallback: If no official captain is found, use the first human on that team
+    const findCap = (team) => {
+      const teamPlayers = players.filter(p => p.team === team);
+      const official = teamPlayers.find(p => p.isCaptain);
+      if (official) return official.uid === currentUser.uid;
+      // Fallback to first human
+      const firstHuman = teamPlayers.find(p => !p.isBot);
+      return firstHuman?.uid === currentUser.uid;
+    };
+
+    const iAmCaller  = findCap(matchData.tossCallerTeam);
     const flipped    = !!matchData.tossCoinResult;
     const winnerName = matchData.tossWinnerTeam === 'A' ? teamAName : teamBName;
-    const iAmWinner  = !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.tossWinnerTeam && p.isCaptain);
+    const iAmWinner  = findCap(matchData.tossWinnerTeam);
     return (
       <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '440px' }}>
         <div className="card" style={{ maxWidth: '440px' }}>

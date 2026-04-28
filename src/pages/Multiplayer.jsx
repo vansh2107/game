@@ -87,21 +87,20 @@ export default function Multiplayer() {
       const assignedTeam = teamCountA <= teamCountB ? 'A' : 'B';
       const existingCap = Object.values(data.players).find(p => p.team === assignedTeam && p.isCaptain);
 
-      // Use setDoc with merge to avoid dot-notation interpretation of UIDs that might contain dots
-      await setDoc(ref, {
+      // Use updateDoc with a single field update for the new player to avoid overwriting the whole 'players' map
+      // We use the full UID as key. Firestore dot-notation only triggers if the string literally contains a dot.
+      await updateDoc(ref, {
         playerIds: arrayUnion(currentUser.uid),
-        players: {
-          [currentUser.uid]: {
-            uid: currentUser.uid,
-            name: finalName,
-            team: assignedTeam,
-            isReady: false,
-            isCaptain: !existingCap,
-            isBot: false,
-            joinedAt: Date.now()
-          }
+        [`players.${currentUser.uid}`]: {
+          uid: currentUser.uid,
+          name: finalName,
+          team: assignedTeam,
+          isReady: false,
+          isCaptain: !existingCap,
+          isBot: false,
+          joinedAt: Date.now()
         }
-      }, { merge: true });
+      });
       setLobbyId(joinCode);
       localStorage.setItem('currentLobby', joinCode);
     } catch (err) {
@@ -216,11 +215,9 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
 
   async function toggleReady() {
     if (!me) return;
-    await setDoc(doc(db, 'lobbies', lobbyId), {
-      players: {
-        [currentUser.uid]: { isReady: !me.isReady }
-      }
-    }, { merge: true });
+    await updateDoc(doc(db, 'lobbies', lobbyId), {
+      [`players.${currentUser.uid}.isReady`]: !me.isReady
+    });
   }
 
   async function sendMsg(e) {
