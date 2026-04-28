@@ -14,19 +14,19 @@ export const ENGINE_CONFIG = {
 
 // ─── RUN CARDS — cricket-themed ──────────────────────────────────────────────
 const RUN_CARDS = [
-  { value: 0, label: 'Dot',    sublabel: 'Safe',       color: 'rgba(55,71,79,0.9)',  border: '#90A4AE', icon: '🛡️' },
-  { value: 1, label: '1 Run',  sublabel: 'Safe',       color: 'rgba(13,71,161,0.9)', border: '#64B5F6', icon: '🏃' },
-  { value: 2, label: '2 Runs', sublabel: 'Balanced',   color: 'rgba(27,94,32,0.9)',  border: '#81C784', icon: '⚡' },
-  { value: 3, label: '3 Runs', sublabel: 'Risky',      color: 'rgba(230,81,0,0.9)',  border: '#FFB74D', icon: '🎯' },
-  { value: 4, label: 'FOUR',   sublabel: 'Risky',      color: 'rgba(183,28,28,0.9)', border: '#FB8C00', icon: '🔥' },
-  { value: 6, label: 'SIX',    sublabel: 'Aggressive', color: 'rgba(74,20,140,0.9)', border: '#FFD700', icon: '💥' },
+  { value: 0, label: 'Dot',    sublabel: 'Defensive',  color: 'rgba(144, 164, 174, 0.9)',  border: '#90A4AE', icon: '🏏' },
+  { value: 1, label: '1 Run',  sublabel: 'Safe',       color: 'rgba(21, 101, 192, 0.9)',   border: '#64B5F6', icon: '🏃' },
+  { value: 2, label: '2 Runs', sublabel: 'Balanced',   color: 'rgba(46, 125, 50, 0.9)',    border: '#81C784', icon: '⚡' },
+  { value: 3, label: '3 Runs', sublabel: 'Risky',      color: 'rgba(121, 85, 72, 0.9)',    border: '#A1887F', icon: '🎯' },
+  { value: 4, label: 'FOUR',   sublabel: 'Boundary',   color: 'rgba(251, 140, 0, 0.9)',    border: '#FB8C00', icon: '🔥' },
+  { value: 6, label: 'SIX',    sublabel: 'Maximum',    color: 'rgba(255, 215, 0, 0.9)',    border: '#FFD700', icon: '💥' },
 ];
 
 // ─── BOWLING STYLES — cricket-themed ─────────────────────────────────────────
 const BOWL_STYLES = [
-  { value: 'defend', label: 'Defend', sublabel: 'Dot balls · low risk',  color: 'rgba(13,71,161,0.9)',  border: '#64B5F6', icon: '🧱' },
-  { value: 'normal', label: 'Normal', sublabel: 'Balanced outcome',      color: 'rgba(27,94,32,0.9)',   border: '#81C784', icon: '⚖️' },
-  { value: 'attack', label: 'Attack', sublabel: 'Wickets or boundaries', color: 'rgba(183,28,28,0.9)',  border: '#EF9A9A', icon: '⚔️' },
+  { value: 'defend', label: 'Defend', sublabel: 'Tight line',  color: 'rgba(21, 101, 192, 0.9)',  border: '#64B5F6', icon: '🛡️' },
+  { value: 'normal', label: 'Normal', sublabel: 'Steady pace', color: 'rgba(46, 125, 50, 0.9)',   border: '#81C784', icon: '⚾' },
+  { value: 'attack', label: 'Attack', sublabel: 'Wicket ball', color: 'rgba(198, 40, 40, 0.9)',   border: '#EF9A9A', icon: '⚔️' },
 ];
 
 // ─── HELPERS ──────────────────────────────────────────────────────────────────
@@ -262,11 +262,11 @@ function RevealPanel({ result }) {
   if (!result) return null;
 
   const cfg = {
-    wicket:   { bg: 'linear-gradient(135deg,#7f0000,#D32F2F)', icon: '💀', accent: '#EF9A9A', label: 'WICKET!',   anim: 'anim-wicket' },
-    six:      { bg: 'linear-gradient(135deg,#4a148c,#7B1FA2)', icon: '💥', accent: '#FFD700', label: 'SIX!',      anim: 'anim-six' },
-    boundary: { bg: 'linear-gradient(135deg,#BF360C,#E64A19)', icon: '🔥', accent: '#FB8C00', label: 'FOUR!',     anim: 'anim-fadein' },
-    dot:      { bg: 'linear-gradient(135deg,#263238,#37474F)', icon: '🛡️', accent: '#90A4AE', label: 'DOT BALL',  anim: 'anim-dot' },
-    runs:     { bg: 'linear-gradient(135deg,#1B5E20,#2E7D32)', icon: '⚡', accent: '#A5D6A7', label: `${result.runs} RUN${result.runs !== 1 ? 'S' : ''}`, anim: 'anim-fadein' },
+    wicket:   { bg: 'linear-gradient(135deg, #7f0000, #D32F2F)', icon: '☝️', accent: '#FFEBEE', label: 'WICKET!',   anim: 'anim-wicket' },
+    six:      { bg: 'linear-gradient(135deg, #FFD700, #FFA000)', icon: '💥', accent: '#FFFFFF', label: 'SIX!',      anim: 'anim-six' },
+    boundary: { bg: 'linear-gradient(135deg, #FB8C00, #E65100)', icon: '🔥', accent: '#FFF3E0', label: 'FOUR!',     anim: 'anim-fadein' },
+    dot:      { bg: 'linear-gradient(135deg, #455A64, #78909C)', icon: '🛡️', accent: '#CFD8DC', label: 'DOT BALL',  anim: 'anim-dot' },
+    runs:     { bg: 'linear-gradient(135deg, #2E7D32, #1B5E20)', icon: '⚡', accent: '#C8E6C9', label: `${result.runs} RUN${result.runs !== 1 ? 'S' : ''}`, anim: 'anim-fadein' },
   }[result.resultType] || { bg: '#263238', icon: '⚡', accent: '#90A4AE', label: '...', anim: '' };
 
   const bowlCard = BOWL_STYLES.find(s => s.value === result.bowlStyle);
@@ -789,15 +789,18 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     <div className="container" style={{ color: 'white', flexDirection: 'column', gap: '12px', maxWidth: '860px', margin: '0 auto' }}>
 
       {/* ── BROADCAST SCOREBOARD ── */}
-      <div className="broadcast-panel" style={{ textAlign: 'center', position: 'relative', padding: '16px 20px' }}>
+      <div className="broadcast-panel anim-fadein" style={{ textAlign: 'center', position: 'relative', padding: '16px 20px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginBottom: '8px' }}>
+          <span className="badge-live">Live</span>
+          <div style={{ fontSize: '11px', color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '2px', fontWeight: 600 }}>
+            Innings {matchData.innings} · Over {matchData.overNumber}.{matchData.ballNumber} / {matchData.totalOvers}
+          </div>
+        </div>
         {pressure && (
-          <div style={{ position: 'absolute', top: '10px', left: '14px', color: 'var(--wicket-color)', fontSize: '11px', fontWeight: 700, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
+          <div style={{ position: 'absolute', top: '10px', left: '14px', color: 'var(--six-color)', fontSize: '10px', fontWeight: 900, letterSpacing: '1.5px', textTransform: 'uppercase', opacity: 0.8 }}>
             🔥 Death Overs
           </div>
         )}
-        <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '3px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-          Innings {matchData.innings} · Over {matchData.overNumber}.{matchData.ballNumber} / {matchData.totalOvers}
-        </div>
         <div style={{ fontSize: '38px', fontWeight: 700, lineHeight: 1, color: 'white' }}>
           {matchData.score}<span style={{ fontSize: '20px', color: 'var(--text-muted)' }}>/{matchData.wickets}</span>
         </div>
