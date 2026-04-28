@@ -8,10 +8,10 @@ export const ENGINE_CONFIG = {
   VERSION: '2.1.0',
   CONSECUTIVE_LIMIT: 2,
   PRESSURE_OVERS: 2,
-  REVEAL_DELAY_MS: 800,    // pause before showing result
+  REVEAL_DELAY_MS: 1000,   // pause before showing result
   NEXT_BALL_DELAY_MS: 3000,  // pause after result before clearing
-  STUCK_RECOVERY_MS: 4000,   // auto-unlock if processing hangs
-  INNINGS_BREAK_MS: 7000,    // time to read target
+  STUCK_RECOVERY_MS: 3000,   // auto-unlock if processing hangs
+  INNINGS_BREAK_MS: 6000,    // time to read target
 };
 
 // ─── RUN CARDS — cricket-themed ──────────────────────────────────────────────
@@ -415,18 +415,22 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     if (matchData.ballInput?.bowler && matchData.ballInput?.batsman) processBall(matchData);
   }, [matchData]);
 
-  // Deadlock recovery — shorter timeout per requirements
+  // Deadlock recovery — 3s threshold per strict requirements
   useEffect(() => {
-    if (!matchData || !imHost || !matchData.processingResult) return;
+    if (!matchData || !imHost) return;
+    if (matchData.status !== 'in-progress' && matchData.status !== 'ball-locked') return;
+    if (!matchData.processingResult) return;
+    
     const t = setTimeout(() => {
       console.warn("[Match Engine] STUCK DETECTED — forcing state reset");
       updateDoc(doc(db, 'matches', matchId), { 
         processingResult: false, 
-        ballInput: { bowler: null, batsman: null } 
+        ballInput: { bowler: null, batsman: null },
+        status: 'in-progress'
       });
     }, ENGINE_CONFIG.STUCK_RECOVERY_MS);
     return () => clearTimeout(t);
-  }, [matchData?.processingResult]);
+  }, [matchData?.processingResult, matchData?.status]);
 
   // Over-break: NO auto-select — captain must choose manually
   // Bot bowling captain auto-selects
@@ -444,26 +448,53 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     }
   }, [matchData?.status, matchData?.overNumber]);
 
-  // Toss bot
+  // Toss bot + Captain Rescue + Auto-Fix
   useEffect(() => {
     if (!matchData || !imHost) return;
-    if (matchData.status === 'toss' && !matchData.tossCall) {
-      const cap = Object.values(lobbyData.players).find(p => p.team === matchData.tossCallerTeam && p.isCaptain);
-      if (cap?.isBot) {
-        const coin = Math.random() > 0.5 ? 'heads' : 'tails';
-        const winner = coin === 'heads' ? matchData.tossCallerTeam : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
-        const t = setTimeout(() => updateDoc(doc(db, 'matches', matchId), { tossCall: 'heads', tossCoinResult: coin, tossWinnerTeam: winner }), 900);
-        return () => clearTimeout(t);
-      }
+    if (matchData.status !== 'toss') return;
+
+    const players = Object.values(lobbyData?.players || {});
+    
+    // Safety 1: Ensure tossCallerTeam exists
+    if (!matchData.tossCallerTeam) {
+      console.warn("[Toss Fix] tossCallerTeam missing, auto-fixing to 'A'");
+      updateDoc(doc(db, 'matches', matchId), { tossCallerTeam: 'A' });
+      return;
     }
-    if (matchData.status === 'toss' && matchData.tossWinnerTeam && !matchData.tossChoice) {
-      const cap = Object.values(lobbyData.players).find(p => p.team === matchData.tossWinnerTeam && p.isCaptain);
-      if (cap?.isBot) {
-        const t = setTimeout(() => submitTossChoice('bat', matchData), 1200);
-        return () => clearTimeout(t);
+
+    const checkCap = (team) => {
+      const teamPlayers = players.filter(p => p.team === team);
+      const hasCap = teamPlayers.some(p => p.isCaptain);
+      if (!hasCap && teamPlayers.length > 0) {
+        const newCap = teamPlayers.find(p => !p.isBot) || teamPlayers[0];
+        console.warn(`[Toss Rescue] No captain for Team ${team}. Promoting ${newCap.name}`);
+        updateDoc(doc(db, 'lobbies', matchId), { [`players.${newCap.uid}.isCaptain`]: true });
       }
+    };
+    checkCap('A'); checkCap('B');
+
+    // Safety 2: Auto-trigger toss if stuck for 5 seconds
+    if (!matchData.tossCall) {
+      const t = setTimeout(() => {
+        if (!matchData.tossCall && matchData.status === 'toss') {
+          console.warn("[Toss Fix] Toss stuck — auto-triggering flip");
+          submitTossCall('heads');
+        }
+      }, 5000);
+      return () => clearTimeout(t);
     }
-  }, [matchData?.status, matchData?.tossCall, matchData?.tossWinnerTeam, matchData?.tossChoice]);
+
+    // Safety 3: Auto-trigger choice if stuck for 5 seconds
+    if (matchData.tossWinnerTeam && !matchData.tossChoice) {
+      const t = setTimeout(() => {
+        if (matchData.tossWinnerTeam && !matchData.tossChoice && matchData.status === 'toss') {
+          console.warn("[Toss Fix] Toss choice stuck — auto-choosing Bat");
+          submitTossChoice('bat', matchData);
+        }
+      }, 5000);
+      return () => clearTimeout(t);
+    }
+  }, [matchData?.status, matchData?.tossCall, matchData?.tossWinnerTeam, matchData?.tossChoice, lobbyData?.players, matchData?.tossCallerTeam]);
 
   async function processBall(m) {
     await updateDoc(doc(db, 'matches', matchId), { processingResult: true });
@@ -585,10 +616,11 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       }); return;
     }
 
-    // GUARANTEE CLEAN STATE after ball — exactly 1 second delay as requested
-    await new Promise(r => setTimeout(r, 1000));
+    // RESET: Clear ballInput and processing flag — exactly 1.5s delay as requested
+    await new Promise(r => setTimeout(r, 1500));
 
     await updateDoc(doc(db, 'matches', matchId), {
+      status: 'in-progress',
       score: nextScore, wickets: nextWickets, ballNumber: nextBall, overNumber: nextOver,
       strikerId: nextStriker, nonStrikerId: swappedNonStriker,
       currentBowlerId: m.currentBowlerId, lastOverBowlerId: m.lastOverBowlerId || null,
@@ -655,7 +687,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       if (!aIds.length || !bIds.length) throw new Error("Teams are empty");
 
       await updateDoc(doc(db, 'matches', matchId), {
-        status: 'in-progress', tossChoice: choice, innings: 1,
+        status: 'innings-start', tossChoice: choice, innings: 1,
         battingTeam: batFirst, bowlingTeam: bowlFirst,
         score: 0, wickets: 0, target: null, ballNumber: 0, overNumber: 0,
         strikerId:    batFirst === 'A' ? aIds[0] : bIds[0],
@@ -698,40 +730,52 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   // ── TOSS ─────────────────────────────────────────────────────────────────────
   if (matchData.status === 'toss') {
-    const players = Object.values(lobbyData.players || {});
+    if (!matchData.tossCallerTeam) return <div className="container center" style={{ color: 'white' }}>Initializing toss phase...</div>;
+
+    const players = Object.values(lobbyData?.players || {});
     const callerName = matchData.tossCallerTeam === 'A' ? teamAName : teamBName;
     
-    // Fallback: If no official captain is found, use the first human on that team
-    const findCap = (team) => {
+    // Inclusive logic: allow captain OR any human on that team to proceed if no captain is marked
+    const canIAct = (team) => {
       const teamPlayers = players.filter(p => p.team === team);
       const official = teamPlayers.find(p => p.isCaptain);
       if (official) return official.uid === currentUser.uid;
-      // Fallback to first human
-      const firstHuman = teamPlayers.find(p => !p.isBot);
-      return firstHuman?.uid === currentUser.uid;
+      // Fallback: Anyone on the team can act if no captain exists
+      const humanOnTeam = teamPlayers.find(p => !p.isBot);
+      return humanOnTeam?.uid === currentUser.uid;
     };
 
-    const iAmCaller  = findCap(matchData.tossCallerTeam);
+    const iAmCaller  = canIAct(matchData.tossCallerTeam);
     const flipped    = !!matchData.tossCoinResult;
     const winnerName = matchData.tossWinnerTeam === 'A' ? teamAName : teamBName;
-    const iAmWinner  = findCap(matchData.tossWinnerTeam);
+    const iAmWinner  = canIAct(matchData.tossWinnerTeam);
+
     return (
-      <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '440px' }}>
-        <div className="card" style={{ maxWidth: '440px' }}>
+      <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '500px' }}>
+        
+        {/* TEMPORARY DEBUG PANEL */}
+        <div style={{ fontSize: '10px', background: 'rgba(0,0,0,0.4)', padding: '5px', borderRadius: '4px', position: 'fixed', top: '10px', left: '10px', textAlign: 'left', zIndex: 1000, pointerEvents: 'none' }}>
+          <div>CallerTeam: {matchData.tossCallerTeam}</div>
+          <div>iAmCaller: {iAmCaller ? 'YES' : 'NO'}</div>
+          <div>WinnerTeam: {matchData.tossWinnerTeam || 'None'}</div>
+          <div>Players: {players.length}</div>
+        </div>
+
+        <div className="card" style={{ maxWidth: '440px', position: 'relative', zIndex: 10 }}>
           <div style={{ fontSize: '64px', marginBottom: '10px' }}>🪙</div>
           <h2 style={{ marginBottom: '6px' }}>The Toss</h2>
           <hr className="crease" />
           {!flipped ? (
             <>
               <p style={{ color: 'var(--text-secondary)', margin: '16px 0' }}>
-                <strong style={{ color: 'white' }}>{callerName}</strong> captain calls the toss
+                <strong style={{ color: 'white' }}>{callerName}</strong> to call the toss
               </p>
               {iAmCaller
                 ? <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => submitTossCall('heads')} className="button primary" style={{ flex: 1 }}>🪙 Heads</button>
                     <button onClick={() => submitTossCall('tails')} className="button secondary" style={{ flex: 1 }}>🔄 Tails</button>
                   </div>
-                : <p style={{ color: 'var(--text-muted)' }}>Waiting for {callerName} captain...</p>}
+                : <p style={{ color: 'var(--text-muted)' }}>Waiting for {callerName} to call...</p>}
             </>
           ) : (
             <>
@@ -747,9 +791,9 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
               {iAmWinner
                 ? <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => submitTossChoice('bat', matchData)} className="button primary" style={{ flex: 1 }}>🏏 Bat First</button>
-                    <button onClick={() => submitTossChoice('bowl', matchData)} className="button secondary" style={{ flex: 1 }}>🎳 Bowl First</button>
+                    <button onClick={() => submitTossChoice('bowl', matchData)} className="button secondary" style={{ flex: 1 }}>Bowling First</button>
                   </div>
-                : <p style={{ color: 'var(--text-muted)' }}>Waiting for {winnerName} captain to choose...</p>}
+                : <p style={{ color: 'var(--text-muted)' }}>Waiting for {winnerName} to choose...</p>}
             </>
           )}
           <hr className="crease" style={{ marginTop: '20px' }} />
@@ -784,8 +828,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     );
   }
 
-  // ── MATCH SUMMARY ─────────────────────────────────────────────────────────────
-  if (matchData.status === 'completed' || matchData.status === 'completed-tie') {
+  // ── COMPLETED ────────────────────────────────────────────────────────────────
+  if (matchData.status?.startsWith('completed')) {
     const isTie = matchData.status === 'completed-tie';
     let resultLine = 'Match Tied!';
     if (!isTie) {
@@ -926,13 +970,13 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       </div>
 
       {/* ── ROLE BANNER ── */}
-      {isMyTurnToBat && (
-        <div style={{ background: `${battingColor}22`, border: `1px solid ${battingColor}`, padding: '8px 14px', borderRadius: '8px', fontSize: '13px', color: battingColor, textAlign: 'center', fontWeight: 600 }}>
+      {isMyTurnToBat && !bothLocked && (
+        <div className="anim-fadein" style={{ background: `${battingColor}22`, border: `1px solid ${battingColor}`, padding: '8px 14px', borderRadius: '8px', fontSize: '13px', color: battingColor, textAlign: 'center', fontWeight: 600 }}>
           🏏 You are on strike — choose your run attempt
         </div>
       )}
-      {isMyTurnToBowl && (
-        <div style={{ background: `${bowlingColor}22`, border: `1px solid ${bowlingColor}`, padding: '8px 14px', borderRadius: '8px', fontSize: '13px', color: bowlingColor, textAlign: 'center', fontWeight: 600 }}>
+      {isMyTurnToBowl && !bothLocked && (
+        <div className="anim-fadein" style={{ background: `${bowlingColor}22`, border: `1px solid ${bowlingColor}`, padding: '8px 14px', borderRadius: '8px', fontSize: '13px', color: bowlingColor, textAlign: 'center', fontWeight: 600 }}>
           🎳 You are bowling — choose your style
         </div>
       )}
@@ -1017,28 +1061,32 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         </div>
       )}
 
-      {/* ── RECENT BALLS ── */}
+      {/* ── RECENT BALLS (BROADCAST STYLE) ── */}
       {matchData.history?.length > 0 && (
-        <div className="broadcast-panel" style={{ padding: '10px 14px' }}>
-          <div style={{ fontSize: '10px', color: 'var(--text-muted)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>This Over</div>
-          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+        <div className="broadcast-panel anim-slideup" style={{ padding: '12px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+            <div style={{ fontSize: '10px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1.5px', fontWeight: 700 }}>Recent Deliveries</div>
+            <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>Over {matchData.overNumber}</div>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
             {[...matchData.history].reverse().slice(0, 6).reverse().map((h, i) => (
-              <div key={i} style={{
-                width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                fontWeight: 700, fontSize: '13px',
-                background: h.isWicket ? 'var(--wicket-color)' : h.runs === 6 ? 'rgba(255,215,0,0.25)' : h.runs === 4 ? 'rgba(251,140,0,0.25)' : h.runs === 0 ? 'rgba(144,164,174,0.15)' : 'rgba(165,214,167,0.2)',
-                color: h.isWicket ? 'white' : h.runs === 6 ? 'var(--six-color)' : h.runs === 4 ? 'var(--four-color)' : h.runs === 0 ? 'var(--dot-color)' : 'var(--runs-color)',
-                border: `1px solid ${h.isWicket ? 'var(--wicket-color)' : h.runs === 6 ? 'var(--six-color)' : h.runs === 4 ? 'var(--four-color)' : 'rgba(255,255,255,0.1)'}`,
+              <div key={i} className="anim-fadein" style={{
+                width: '36px', height: '36px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontWeight: 800, fontSize: '14px',
+                background: h.isWicket ? 'var(--wicket-color)' : h.runs === 6 ? 'rgba(255,215,0,0.15)' : h.runs === 4 ? 'rgba(251,140,0,0.15)' : 'rgba(255,255,255,0.05)',
+                color: h.isWicket ? 'white' : h.runs === 6 ? 'var(--six-color)' : h.runs === 4 ? 'var(--four-color)' : 'white',
+                border: `2px solid ${h.isWicket ? 'var(--wicket-color)' : h.runs === 6 ? 'var(--six-color)' : h.runs === 4 ? 'var(--four-color)' : 'rgba(255,255,255,0.15)'}`,
+                boxShadow: (h.runs >= 4 || h.isWicket) ? `0 0 10px ${h.isWicket ? 'var(--wicket-color)' : h.runs === 6 ? 'var(--six-color)' : 'var(--four-color)'}33` : 'none'
               }}>
                 {h.isWicket ? 'W' : h.runs}
               </div>
             ))}
+            {matchData.history.length > 0 && (
+              <div className="anim-fadein" style={{ marginLeft: 'auto', fontSize: '13px', color: 'var(--text-secondary)', fontStyle: 'italic', borderLeft: '1px solid rgba(255,255,255,0.1)', paddingLeft: '12px' }}>
+                {matchData.history[matchData.history.length - 1].commentary}
+              </div>
+            )}
           </div>
-          {matchData.history.length > 0 && (
-            <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--text-secondary)', fontStyle: 'italic' }}>
-              {matchData.history[matchData.history.length - 1].commentary}
-            </div>
-          )}
         </div>
       )}
 

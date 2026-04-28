@@ -207,7 +207,9 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
   const me = lobbyData?.players?.[currentUser.uid] || null; // null for spectators
   const isHost = lobbyData?.hostId === currentUser.uid;
   const isAllReady = playersArr.length >= 2 && playersArr.every(p => p.isReady);
-  const isValidTeams = teamA.length > 0 && teamA.length === teamB.length;
+  const capA = teamA.find(p => p.isCaptain);
+  const capB = teamB.find(p => p.isCaptain);
+  const isValidTeams = teamA.length > 0 && teamA.length === teamB.length && !!capA && !!capB;
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -319,10 +321,13 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
     const teamAIds = teamA.map(p => p.uid);
     const teamBIds = teamB.map(p => p.uid);
 
+    // Randomize toss caller
+    const tossCaller = Math.random() > 0.5 ? 'A' : 'B';
+
     await setDoc(doc(db, 'matches', lobbyId), {
       status: 'toss',
       matchVersion: ENGINE_CONFIG.VERSION,
-      tossCallerTeam: 'A',
+      tossCallerTeam: tossCaller,
       tossCall: null,
       tossCoinResult: null,
       tossWinnerTeam: null,
@@ -396,7 +401,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
           )}
           {isHost && (
             <button onClick={startMatch} className="button primary" style={{ width: 'auto' }} disabled={!isAllReady || !isValidTeams}>
-              Start Match
+              {(!capA || !capB) ? 'Need Captains' : 'Start Match'}
             </button>
           )}
           <button onClick={leaveLobby} className="button secondary" style={{ width: 'auto' }}>Leave</button>
