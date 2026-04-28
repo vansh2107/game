@@ -354,8 +354,8 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
         <strong>{p.name}</strong>
         {p.uid === currentUser.uid && ' (You)'}
         {lobbyData.hostId === p.uid && <span style={{ marginLeft: '5px', color: 'var(--primary-color)' }}>[HOST]</span>}
-        {p.isCaptain && <span style={{ marginLeft: '5px', color: 'gold' }}>[C]</span>}
-        {p.isBot && <span style={{ marginLeft: '5px', color: 'gray' }}>[BOT]</span>}
+        {p.isCaptain && <span style={{ marginLeft: '5px', color: 'var(--six-color)' }}>[C]</span>}
+        {p.isBot && <span style={{ marginLeft: '5px', color: 'var(--text-secondary)' }}>[BOT]</span>}
         {p.isReady
           ? <span style={{ marginLeft: '8px', color: 'var(--success-color)' }}>Ready</span>
           : <span style={{ marginLeft: '8px', color: 'var(--error-color)' }}>Wait</span>}
@@ -368,7 +368,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
           <button style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => makeCaptain(p.uid, p.team)}>Make Cap</button>
         )}
         {isHost && p.uid !== currentUser.uid && (
-          <button style={{ fontSize: '10px', padding: '2px 5px', color: 'lightcoral' }} onClick={() => kickPlayer(p.uid)}>Kick</button>
+          <button style={{ fontSize: '10px', padding: '2px 5px', color: 'var(--error-color)' }} onClick={() => kickPlayer(p.uid)}>Kick</button>
         )}
         {isHost && p.uid !== currentUser.uid && !p.isBot && (
           <button style={{ fontSize: '10px', padding: '2px 5px' }} onClick={() => transferHost(p.uid)}>Host</button>
@@ -406,7 +406,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
         <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
           <strong>Host Controls:</strong>
           <label>Overs:</label>
-          <select value={lobbyData.overs} onChange={updateOvers} style={{ background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid gray', padding: '5px' }}>
+          <select value={lobbyData.overs} onChange={updateOvers} style={{ background: 'rgba(0,0,0,0.5)', color: 'white', border: '1px solid var(--overlay-border)', padding: '5px' }}>
             <option value="2">2</option>
             <option value="5">5</option>
             <option value="10">10</option>
@@ -418,7 +418,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
           </label>
           <button onClick={() => addBot('A')} className="button secondary" style={{ width: 'auto', padding: '5px 10px', marginLeft: 'auto' }}>+ Bot A</button>
           <button onClick={() => addBot('B')} className="button secondary" style={{ width: 'auto', padding: '5px 10px' }}>+ Bot B</button>
-          {!isValidTeams && <span style={{ color: 'orange', fontSize: '12px' }}>Teams unbalanced!</span>}
+          {!isValidTeams && <span style={{ color: 'var(--four-color)', fontSize: '12px' }}>Teams unbalanced!</span>}
         </div>
       )}
 
@@ -426,7 +426,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
       <div className="flex-row-responsive" style={{ flex: 1 }}>
         {/* Team A */}
         <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', minHeight: '300px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid gray', paddingBottom: '10px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--overlay-border)', paddingBottom: '10px', marginBottom: '10px' }}>
             <input
               type="text"
               value={lobbyData.teamAName}
@@ -441,7 +441,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
 
         {/* Team B */}
         <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', minHeight: '300px' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid gray', paddingBottom: '10px', marginBottom: '10px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--overlay-border)', paddingBottom: '10px', marginBottom: '10px' }}>
             <input
               type="text"
               value={lobbyData.teamBName}
@@ -456,7 +456,7 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
 
         {/* Chat */}
         <div style={{ flex: 0.8, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', display: 'flex', flexDirection: 'column', minHeight: '300px' }}>
-          <h3 style={{ borderBottom: '1px solid gray', paddingBottom: '10px', margin: 0 }}>Lobby Chat</h3>
+          <h3 style={{ borderBottom: '1px solid var(--overlay-border)', paddingBottom: '10px', margin: 0 }}>Lobby Chat</h3>
           <div style={{ flex: 1, overflowY: 'auto', marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '8px', paddingBottom: '10px' }}>
             {(lobbyData.messages || []).map((msg, i) => (
               <div key={i} style={{ fontSize: '14px' }}>
