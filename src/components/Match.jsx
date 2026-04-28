@@ -327,7 +327,17 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       if (snap.exists()) {
         const data = snap.data();
         setMatchData(data);
-        if (data.lastResult) setLastResult(data.lastResult);
+        if (data.lastResult) {
+          setLastResult(prev => {
+            // Only update if it's a truly new result (different commentary or different ball)
+            if (prev?.commentary === data.lastResult.commentary && 
+                prev?.ballNumber === data.lastResult.ballNumber &&
+                prev?.overNumber === data.lastResult.overNumber) {
+              return prev;
+            }
+            return data.lastResult;
+          });
+        }
       }
     });
     return () => unsub();
@@ -358,9 +368,10 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   useEffect(() => {
     if (!lastResult) return;
     setActionsReady(false);
+    // Use a unique key to ensure the delay always triggers for a new ball result
     const t = setTimeout(() => setActionsReady(true), ENGINE_CONFIG.NEXT_BALL_DELAY_MS);
     return () => clearTimeout(t);
-  }, [lastResult?.commentary]);
+  }, [lastResult?.commentary, lastResult?.ballNumber, lastResult?.overNumber]);
 
   function forceTimeout(m) {
     const u = {};
@@ -569,18 +580,30 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   async function submitBowling() {
     if (!selectedStyle || loading || !matchData) return;
-    if (matchData.currentBowlerId !== currentUser.uid || matchData.ballInput?.bowler) return;
-    setLoading(true);
-    await updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': { style: selectedStyle, submittedBy: currentUser.uid } });
-    setLoading(false);
+    if (matchData.currentBowlerId !== currentUser?.uid || matchData.ballInput?.bowler) return;
+    try {
+      setLoading(true);
+      await updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': { style: selectedStyle, submittedBy: currentUser.uid } });
+    } catch (err) {
+      console.error("Bowling submission failed:", err);
+      alert("Failed to lock delivery. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitBatting() {
     if (selectedRun === null || loading || !matchData) return;
-    if (matchData.strikerId !== currentUser.uid || matchData.ballInput?.batsman) return;
-    setLoading(true);
-    await updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': { runAttempt: selectedRun, submittedBy: currentUser.uid } });
-    setLoading(false);
+    if (matchData.strikerId !== currentUser?.uid || matchData.ballInput?.batsman) return;
+    try {
+      setLoading(true);
+      await updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': { runAttempt: selectedRun, submittedBy: currentUser.uid } });
+    } catch (err) {
+      console.error("Batting submission failed:", err);
+      alert("Failed to lock shot. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function submitNextBowler(uid) {
@@ -619,6 +642,13 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   const nonStrikerName = resolveName(matchData.nonStrikerId, lobbyData);
   const bowlerName     = resolveName(matchData.currentBowlerId, lobbyData);
   const pressure       = matchData.overNumber !== undefined && isPressure(matchData.overNumber, matchData.totalOvers);
+
+  // DEBUG turn info if player is confused
+  useEffect(() => {
+    if (matchData?.status === 'in-progress') {
+      console.log(`[Match Debug] UID: ${currentUser?.uid}, Striker: ${matchData.strikerId}, Bowler: ${matchData.currentBowlerId}`);
+    }
+  }, [matchData?.strikerId, matchData?.currentBowlerId, matchData?.status]);
   const bothLocked     = !!(matchData.ballInput?.bowler && matchData.ballInput?.batsman);
   const teamAName      = lobbyData.teamAName;
   const teamBName      = lobbyData.teamBName;

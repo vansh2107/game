@@ -87,18 +87,21 @@ export default function Multiplayer() {
       const assignedTeam = teamCountA <= teamCountB ? 'A' : 'B';
       const existingCap = Object.values(data.players).find(p => p.team === assignedTeam && p.isCaptain);
 
-      await updateDoc(ref, {
-        playerIds: [...data.playerIds, currentUser.uid],
-        [`players.${currentUser.uid}`]: {
-          uid: currentUser.uid,
-          name: finalName,
-          team: assignedTeam,
-          isReady: false,
-          isCaptain: !existingCap,
-          isBot: false,
-          joinedAt: Date.now()
+      // Use setDoc with merge to avoid dot-notation interpretation of UIDs that might contain dots
+      await setDoc(ref, {
+        playerIds: arrayUnion(currentUser.uid),
+        players: {
+          [currentUser.uid]: {
+            uid: currentUser.uid,
+            name: finalName,
+            team: assignedTeam,
+            isReady: false,
+            isCaptain: !existingCap,
+            isBot: false,
+            joinedAt: Date.now()
+          }
         }
-      });
+      }, { merge: true });
       setLobbyId(joinCode);
       localStorage.setItem('currentLobby', joinCode);
     } catch (err) {
@@ -199,8 +202,8 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
   const chatEndRef = useRef(null);
 
   const playersArr = Object.values(lobbyData.players || {});
-  const teamA = playersArr.filter(p => p.team === 'A');
-  const teamB = playersArr.filter(p => p.team === 'B');
+  const teamA = playersArr.filter(p => p.team === 'A').sort((a, b) => a.joinedAt - b.joinedAt);
+  const teamB = playersArr.filter(p => p.team === 'B').sort((a, b) => a.joinedAt - b.joinedAt);
 
   const me = lobbyData.players[currentUser.uid] || null; // null for spectators
   const isHost = lobbyData.hostId === currentUser.uid;
@@ -213,9 +216,11 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
 
   async function toggleReady() {
     if (!me) return;
-    await updateDoc(doc(db, 'lobbies', lobbyId), {
-      [`players.${currentUser.uid}.isReady`]: !me.isReady
-    });
+    await setDoc(doc(db, 'lobbies', lobbyId), {
+      players: {
+        [currentUser.uid]: { isReady: !me.isReady }
+      }
+    }, { merge: true });
   }
 
   async function sendMsg(e) {
