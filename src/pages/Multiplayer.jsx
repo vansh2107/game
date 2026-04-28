@@ -73,7 +73,7 @@ export default function Multiplayer() {
       const data = snap.data();
       if (data.status !== 'waiting') throw new Error('Match already started');
       if (data.playerIds.length >= 22) throw new Error('Lobby is full');
-      if (data.playerIds.includes(currentUser.uid)) {
+      if (data?.playerIds?.includes(currentUser.uid)) {
         setLobbyId(joinCode);
         localStorage.setItem('currentLobby', joinCode);
         return;
@@ -200,12 +200,12 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
   const [chatMsg, setChatMsg] = useState('');
   const chatEndRef = useRef(null);
 
-  const playersArr = Object.values(lobbyData.players || {});
+  const playersArr = Object.values(lobbyData?.players || {});
   const teamA = playersArr.filter(p => p.team === 'A').sort((a, b) => a.joinedAt - b.joinedAt);
   const teamB = playersArr.filter(p => p.team === 'B').sort((a, b) => a.joinedAt - b.joinedAt);
 
-  const me = lobbyData.players[currentUser.uid] || null; // null for spectators
-  const isHost = lobbyData.hostId === currentUser.uid;
+  const me = lobbyData?.players?.[currentUser.uid] || null; // null for spectators
+  const isHost = lobbyData?.hostId === currentUser.uid;
   const isAllReady = playersArr.length >= 2 && playersArr.every(p => p.isReady);
   const isValidTeams = teamA.length > 0 && teamA.length === teamB.length;
 

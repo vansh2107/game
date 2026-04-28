@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../firebase';
 import { doc, onSnapshot, updateDoc } from 'firebase/firestore';
 import { useAuth } from '../AuthContext';
@@ -503,9 +503,10 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     const nextOutPlayers = [...(m.outPlayers || [])];
     if (isWicket) nextOutPlayers.push(m.strikerId);
 
+    const teamList = m.teamLists?.[m.battingTeam] || [];
     const maxWickets = m.lastManStand
-      ? m.teamLists[m.battingTeam].length
-      : Math.max(1, m.teamLists[m.battingTeam].length - 1);
+      ? teamList.length
+      : Math.max(1, teamList.length - 1);
     const endOfInnings   = nextWickets >= maxWickets || nextOver >= m.totalOvers;
     const chaseSucceeded = m.innings === 2 && nextScore >= m.target;
     const chaseFailed    = m.innings === 2 && endOfInnings && nextScore < m.target;
@@ -650,9 +651,13 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   if (!matchData) return <div className="container center" style={{ color: 'white' }}>Loading Match...</div>;
 
   const isMyTurnToBowl = matchData.currentBowlerId === currentUser.uid;
+  const me = lobbyData?.players?.[currentUser.uid] || null;
+  const isHost = lobbyData?.hostId === currentUser.uid;
+  const isAllReady = lobbyData?.players && Object.values(lobbyData.players).length >= 2 && Object.values(lobbyData.players).every(p => p.isReady);
+  const isValidTeams = lobbyData?.teamLists?.A?.length > 0 && lobbyData?.teamLists?.A?.length === lobbyData?.teamLists?.B?.length;
   const isMyTurnToBat  = matchData.strikerId === currentUser.uid;
   const isNonStriker   = matchData.nonStrikerId === currentUser.uid;
-  const amBowlingCap   = !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.bowlingTeam && p.isCaptain);
+  const amBowlingCap   = lobbyData?.players && !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.bowlingTeam && p.isCaptain);
   const strikerName    = resolveName(matchData.strikerId, lobbyData);
   const nonStrikerName = resolveName(matchData.nonStrikerId, lobbyData);
   const bowlerName     = resolveName(matchData.currentBowlerId, lobbyData);
@@ -665,8 +670,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     }
   }, [matchData?.strikerId, matchData?.currentBowlerId, matchData?.status]);
   const bothLocked     = !!(matchData.ballInput?.bowler && matchData.ballInput?.batsman);
-  const teamAName      = lobbyData.teamAName;
-  const teamBName      = lobbyData.teamBName;
+  const teamAName      = lobbyData?.teamAName || 'Team A';
+  const teamBName      = lobbyData?.teamBName || 'Team B';
   const battingTeamName  = matchData.battingTeam  === 'A' ? teamAName : teamBName;
   const bowlingTeamName  = matchData.bowlingTeam  === 'A' ? teamAName : teamBName;
 
@@ -804,7 +809,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   // ── OVER BREAK ────────────────────────────────────────────────────────────────
   if (matchData.status === 'over-break') {
-    const roster   = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
+    const players = Object.values(lobbyData?.players || {});
+    const roster   = players.filter(p => p.team === matchData.bowlingTeam);
     const eligible = roster.filter(p => p.uid !== matchData.lastOverBowlerId);
     const bowlerList = eligible.length > 0 ? eligible : roster;
     const bowlColor = matchData.bowlingTeam === 'A' ? 'var(--team-a)' : 'var(--team-b)';
