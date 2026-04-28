@@ -5,133 +5,29 @@ import { useAuth } from '../AuthContext';
 
 export const ENGINE_CONFIG = {
   TURN_TIMER_SEC: 30,
-  ACCURACY_POOR_THRESHOLD: 0.2,
-  ACCURACY_PERFECT_THRESHOLD: 0.8,
-  VERSION: '1.0.0',
+  VERSION: '2.0.0',
   CONSECUTIVE_LIMIT: 2,
-  TOTAL_FIELDERS: 10,
+  PRESSURE_OVERS: 2, // last N overs = pressure zone
 };
 
-const ZONES = ['off', 'straight', 'leg', 'deep-off', 'deep-leg'];
-const DEFAULT_FIELD = { off: 3, straight: 3, leg: 2, 'deep-off': 1, 'deep-leg': 1 };
+// ─── RUN CARDS ────────────────────────────────────────────────────────────────
+const RUN_CARDS = [
+  { value: 0, label: 'Dot', sublabel: 'Safe', color: '#334155', icon: '🛡️' },
+  { value: 1, label: '1 Run', sublabel: 'Safe', color: '#1e40af', icon: '🏃' },
+  { value: 2, label: '2 Runs', sublabel: 'Balanced', color: '#065f46', icon: '⚡' },
+  { value: 3, label: '3 Runs', sublabel: 'Risky', color: '#92400e', icon: '🎯' },
+  { value: 4, label: 'FOUR', sublabel: 'Risky', color: '#7c2d12', icon: '🔥' },
+  { value: 6, label: 'SIX', sublabel: 'Aggressive', color: '#581c87', icon: '💥' },
+];
 
-const SHOT_VISUALS = {
-  'drive': { icon: '🏏', bgColor: 'linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)', label: 'Classic Drive' },
-  'cover drive': { icon: '✨🏏', bgColor: 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)', label: 'Elegant Cover Drive' },
-  'straight drive': { icon: '🎯🏏', bgColor: 'linear-gradient(135deg, #2980b9 0%, #6dd5fa 100%)', label: 'Straight Drive' },
-  'pull': { icon: '🌪️🏏', bgColor: 'linear-gradient(135deg, #cb2d3e 0%, #ef473a 100%)', label: 'Aggressive Pull' },
-  'cut': { icon: '⚔️🏏', bgColor: 'linear-gradient(135deg, #ff9966 0%, #ff5e62 100%)', label: 'Late Cut' },
-  'sweep': { icon: '🧹🏏', bgColor: 'linear-gradient(135deg, #f7971e 0%, #ffd200 100%)', label: 'Sweep Shot' },
-  'scoop': { icon: '🥄🏏', bgColor: 'linear-gradient(135deg, #8A2387 0%, #E94057 100%)', label: 'Ramp / Scoop' },
-  'helicopter shot': { icon: '🚁🏏', bgColor: 'linear-gradient(135deg, #00C9FF 0%, #92FE9D 100%)', label: 'Helicopter Shot' },
-};
+// ─── BOWLING STYLES ───────────────────────────────────────────────────────────
+const BOWL_STYLES = [
+  { value: 'defend', label: 'Defend', sublabel: 'Dot balls, low risk', color: '#1e3a5f', icon: '🧱' },
+  { value: 'normal', label: 'Normal', sublabel: 'Balanced outcome', color: '#1e3a2f', icon: '⚖️' },
+  { value: 'attack', label: 'Attack', sublabel: 'Wickets or runs', color: '#4a1942', icon: '⚔️' },
+];
 
-const BOWLING_VISUALS = {
-  'fast': { icon: '🔥🥎', bgColor: 'linear-gradient(135deg, #FF416C 0%, #FF4B2B 100%)', label: 'Pace Delivery' },
-  'spin': { icon: '🌀🥎', bgColor: 'linear-gradient(135deg, #4b6cb7 0%, #182848 100%)', label: 'Spin Delivery' },
-  'yorker': { icon: '🎯🥎', bgColor: 'linear-gradient(135deg, #FDC830 0%, #F37335 100%)', label: 'Toe-Crushing Yorker' },
-  'bouncer': { icon: '🚀🥎', bgColor: 'linear-gradient(135deg, #141E30 0%, #243B55 100%)', label: 'Aggressive Bouncer' },
-};
-
-function ActionCinematicPanel({ type, choiceObj, isSubmitted }) {
-  if (!choiceObj) return null;
-  let data;
-  if (type === 'batting') {
-    const visual = SHOT_VISUALS[choiceObj.shotType] || SHOT_VISUALS['drive'];
-    data = {
-      title: isSubmitted ? 'Shot Locked In!' : 'Shot Selection Preview',
-      icon: visual.icon,
-      bg: visual.bgColor,
-      mainText: visual.label,
-      subText: `Intent: ${choiceObj.intent.toUpperCase()} | Direction: ${choiceObj.direction.toUpperCase()} | Loft: ${choiceObj.loft.toUpperCase()}`
-    };
-  } else {
-    const visual = BOWLING_VISUALS[choiceObj.deliveryType] || BOWLING_VISUALS['fast'];
-    data = {
-      title: isSubmitted ? 'Delivery Locked In!' : 'Delivery Selection Preview',
-      icon: visual.icon,
-      bg: visual.bgColor,
-      mainText: visual.label,
-      subText: `Line: ${choiceObj.line.toUpperCase()}`
-    };
-  }
-
-  return (
-    <div style={{
-      width: '100%',
-      padding: '20px',
-      borderRadius: '12px',
-      background: data.bg,
-      color: 'white',
-      display: 'flex',
-      alignItems: 'center',
-      gap: '20px',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-      position: 'relative',
-      overflow: 'hidden',
-      transition: 'all 0.3s ease'
-    }}>
-      <div style={{ fontSize: '54px', zIndex: 2, filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.4))' }}>{data.icon}</div>
-      <div style={{ zIndex: 2, textAlign: 'left' }}>
-        <p style={{ margin: '0 0 5px 0', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '2px', opacity: 0.8 }}>{data.title}</p>
-        <h2 style={{ margin: '0 0 10px 0', fontSize: '24px', textShadow: '0 2px 4px rgba(0,0,0,0.5)' }}>{data.mainText}</h2>
-        <p style={{ margin: 0, fontSize: '13px', background: 'rgba(0,0,0,0.3)', padding: '5px 10px', borderRadius: '4px', display: 'inline-block' }}>{data.subText}</p>
-      </div>
-      <div style={{
-         position: 'absolute', top: '-10%', right: '-4%', fontSize: '140px', opacity: 0.1, zIndex: 1, transform: 'rotate(-15deg)', pointerEvents: 'none'
-      }}>
-        {data.icon.replace(/[^🥎🏏]/g, '') || data.icon.substring(0, 2)}
-      </div>
-    </div>
-  );
-}
-
-// Random bot action generators
-function randomBowlingAction() {
-  const deliveryTypes = ['fast', 'spin', 'yorker', 'bouncer'];
-  const lines = ['off', 'middle', 'leg'];
-  return {
-    deliveryType: deliveryTypes[Math.floor(Math.random() * deliveryTypes.length)],
-    line: lines[Math.floor(Math.random() * lines.length)]
-  };
-}
-
-function randomBattingAction() {
-  const shotTypes = ['drive', 'cover drive', 'straight drive', 'pull', 'cut', 'sweep', 'scoop', 'helicopter shot'];
-  const intents = ['attack', 'neutral', 'defend'];
-  const directions = ['off', 'straight', 'leg'];
-  const lofts = ['ground', 'lofted'];
-  return {
-    shotType: shotTypes[Math.floor(Math.random() * shotTypes.length)],
-    intent: intents[Math.floor(Math.random() * intents.length)],
-    direction: directions[Math.floor(Math.random() * directions.length)],
-    loft: lofts[Math.floor(Math.random() * lofts.length)]
-  };
-}
-
-function randomFieldSettings() {
-  // Generate varied field placements — not always the same
-  const presets = [
-    { off: 3, straight: 3, leg: 2, 'deep-off': 1, 'deep-leg': 1 }, // balanced
-    { off: 4, straight: 2, leg: 2, 'deep-off': 1, 'deep-leg': 1 }, // off-heavy
-    { off: 2, straight: 2, leg: 4, 'deep-off': 1, 'deep-leg': 1 }, // leg-heavy
-    { off: 2, straight: 4, leg: 2, 'deep-off': 1, 'deep-leg': 1 }, // straight-heavy
-    { off: 2, straight: 2, leg: 2, 'deep-off': 2, 'deep-leg': 2 }, // deep-heavy
-  ];
-  return presets[Math.floor(Math.random() * presets.length)];
-}
-
-
-// Maps shot direction + loft to the relevant field zone
-function checkFielder(fieldSettings, shotDirection, loft) {
-  const field = fieldSettings || DEFAULT_FIELD;
-  const zone = loft === 'lofted'
-    ? (shotDirection === 'leg' ? 'deep-leg' : 'deep-off')
-    : shotDirection;
-  return (field[zone] || 0) > 0;
-}
-
-// Resolve a player UID to a display name using lobbyData
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
 function resolveName(uid, lobbyData) {
   if (!uid) return '—';
   const p = lobbyData?.players?.[uid];
@@ -140,322 +36,342 @@ function resolveName(uid, lobbyData) {
   return uid.slice(0, 8) + '…';
 }
 
-// FieldSetter — bowling captain sets field before each ball
-// FIX: accepts a `key` prop from parent to force re-mount when field is externally reset
-function FieldSetter({ current, onSave }) {
-  const [field, setField] = useState({ ...DEFAULT_FIELD, ...(current || {}) });
-  const total = Object.values(field).reduce((a, b) => a + b, 0);
-  const remaining = ENGINE_CONFIG.TOTAL_FIELDERS - total;
+function isPressureOver(overNumber, totalOvers) {
+  return overNumber >= totalOvers - ENGINE_CONFIG.PRESSURE_OVERS;
+}
 
-  function adjust(zone, delta) {
-    const next = { ...field, [zone]: Math.max(0, (field[zone] || 0) + delta) };
-    if (Object.values(next).reduce((a, b) => a + b, 0) > ENGINE_CONFIG.TOTAL_FIELDERS) return;
-    setField(next);
+function randomBotBatting(runAttempt) {
+  // Bots pick weighted random — lean toward 1s and 2s
+  const weights = [0.15, 0.30, 0.25, 0.10, 0.12, 0.08];
+  const r = Math.random();
+  let cum = 0;
+  for (let i = 0; i < weights.length; i++) {
+    cum += weights[i];
+    if (r < cum) return { runAttempt: RUN_CARDS[i].value };
+  }
+  return { runAttempt: 1 };
+}
+
+function randomBotBowling() {
+  const styles = ['defend', 'normal', 'attack'];
+  return { style: styles[Math.floor(Math.random() * styles.length)] };
+}
+
+// ─── ENGINE ───────────────────────────────────────────────────────────────────
+function evaluateOutcome(bowlStyle, runAttempt, pressure) {
+  // Returns { runs, isWicket, wicketType, commentary, resultType }
+  // resultType: 'dot' | 'runs' | 'boundary' | 'six' | 'wicket'
+  const r = Math.random();
+
+  // Pressure multiplier — last overs raise stakes
+  const pm = pressure ? 1.3 : 1.0;
+
+  // Base wicket probabilities per bowling style
+  const wicketBase = { defend: 0.06, normal: 0.12, attack: 0.22 };
+  // Base boundary probabilities per run attempt
+  const boundaryBase = { 0: 0.02, 1: 0.04, 2: 0.08, 3: 0.14, 4: 0.30, 6: 0.50 };
+
+  const wicketChance = wicketBase[bowlStyle] * pm;
+  const boundaryChance = boundaryBase[runAttempt] * pm;
+
+  // Attack bowl vs aggressive bat = high drama
+  const bothAggressive = bowlStyle === 'attack' && runAttempt >= 4;
+  const bothDefensive = bowlStyle === 'defend' && runAttempt === 0;
+
+  // Wicket check
+  let wicketRoll = r;
+  if (bothAggressive) wicketRoll *= 0.7; // more likely to go for runs
+  if (runAttempt === 0 && bowlStyle === 'attack') wicketRoll *= 0.6; // defend vs attack = more wicket risk
+
+  if (wicketRoll < wicketChance) {
+    const types = ['bowled', 'caught', 'lbw', 'run out'];
+    const typeWeights = bowlStyle === 'attack'
+      ? [0.3, 0.4, 0.2, 0.1]
+      : [0.25, 0.25, 0.35, 0.15];
+    let tw = Math.random(), cum = 0;
+    let wicketType = 'caught';
+    for (let i = 0; i < types.length; i++) {
+      cum += typeWeights[i];
+      if (tw < cum) { wicketType = types[i]; break; }
+    }
+    const commentaries = {
+      bowled: ['Timber! The stumps are shattered!', 'Clean bowled! What a delivery!', 'Beaten all ends up — bowled!'],
+      caught: ['Skied it... and taken! CAUGHT!', 'Finds the fielder perfectly. OUT!', 'Straight down the throat — CAUGHT!'],
+      lbw: ['Plumb in front! Finger goes up. LBW!', 'Trapped on the crease — LBW!', 'Big appeal... and given! LBW!'],
+      'run out': ['Mix up in the middle! Direct hit — RUN OUT!', 'Sent back too late — RUN OUT!'],
+    };
+    const pool = commentaries[wicketType];
+    return {
+      runs: 0, isWicket: true, wicketType,
+      commentary: pool[Math.floor(Math.random() * pool.length)],
+      resultType: 'wicket'
+    };
   }
 
+  // Boundary / runs check
+  if (r < boundaryChance) {
+    if (runAttempt === 6) {
+      const sixCommentary = [
+        'Absolutely smashed! That\'s a SIX!', 'Into the stands! Massive SIX!',
+        'Cleared the rope with ease! SIX!', 'That\'s gone all the way! SIX!'
+      ];
+      return { runs: 6, isWicket: false, wicketType: null, commentary: sixCommentary[Math.floor(Math.random() * sixCommentary.length)], resultType: 'six' };
+    }
+    if (runAttempt >= 4) {
+      const fourCommentary = [
+        'Cracked through the gap! FOUR!', 'Races away to the boundary! FOUR!',
+        'Pierces the field perfectly! FOUR!', 'Timed to perfection — FOUR!'
+      ];
+      return { runs: 4, isWicket: false, wicketType: null, commentary: fourCommentary[Math.floor(Math.random() * fourCommentary.length)], resultType: 'boundary' };
+    }
+  }
+
+  // Dot ball check
+  if (bothDefensive || (bowlStyle === 'defend' && runAttempt <= 1 && r > 0.55)) {
+    const dotCommentary = ['Dot ball. Pressure building.', 'Defended solidly. No run.', 'Tight line, nothing to hit.', 'Maiden territory — dot ball.'];
+    return { runs: 0, isWicket: false, wicketType: null, commentary: dotCommentary[Math.floor(Math.random() * dotCommentary.length)], resultType: 'dot' };
+  }
+
+  // Normal runs — capped at runAttempt, may get less
+  const actualRuns = Math.min(runAttempt, Math.max(0, runAttempt - Math.floor(Math.random() * 2)));
+  const runCommentary = [
+    `${actualRuns} run${actualRuns !== 1 ? 's' : ''} taken.`,
+    `Pushed into the gap for ${actualRuns}.`,
+    `Worked away for ${actualRuns}.`,
+    `${actualRuns} off that delivery.`,
+  ];
+  return {
+    runs: actualRuns, isWicket: false, wicketType: null,
+    commentary: runCommentary[Math.floor(Math.random() * runCommentary.length)],
+    resultType: actualRuns === 0 ? 'dot' : 'runs'
+  };
+}
+
+// ─── CARD BUTTON ──────────────────────────────────────────────────────────────
+function CardButton({ card, selected, onSelect, disabled }) {
   return (
-    <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>
-      <h3 style={{ margin: '0 0 10px' }}>
-        Set Field
-        <span style={{ fontSize: '13px', color: remaining === 0 ? 'var(--success-color)' : 'orange', marginLeft: '10px' }}>
-          {remaining === 0 ? '✓ Ready' : `${remaining} left to place`}
-        </span>
-      </h3>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
-        {ZONES.map(zone => (
-          <div key={zone} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'rgba(255,255,255,0.05)', padding: '6px 10px', borderRadius: '6px' }}>
-            <span style={{ flex: 1, fontSize: '13px', textTransform: 'capitalize' }}>{zone.replace('-', ' ')}</span>
-            <button onClick={() => adjust(zone, -1)} style={{ padding: '2px 8px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>−</button>
-            <span style={{ minWidth: '20px', textAlign: 'center' }}>{field[zone] || 0}</span>
-            <button onClick={() => adjust(zone, 1)} style={{ padding: '2px 8px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}>+</button>
-          </div>
-        ))}
+    <button
+      onClick={() => !disabled && onSelect(card.value)}
+      disabled={disabled}
+      style={{
+        background: selected ? card.color : 'rgba(255,255,255,0.05)',
+        border: selected ? `2px solid white` : '2px solid rgba(255,255,255,0.1)',
+        borderRadius: '12px',
+        padding: '14px 8px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '4px',
+        transition: 'all 0.15s ease',
+        transform: selected ? 'scale(1.06)' : 'scale(1)',
+        boxShadow: selected ? '0 0 20px rgba(255,255,255,0.2)' : 'none',
+        minWidth: '70px',
+        flex: 1,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <span style={{ fontSize: '22px' }}>{card.icon}</span>
+      <span style={{ fontWeight: 'bold', fontSize: '15px' }}>{card.label}</span>
+      <span style={{ fontSize: '10px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.5px' }}>{card.sublabel}</span>
+    </button>
+  );
+}
+
+// ─── STYLE BUTTON ─────────────────────────────────────────────────────────────
+function StyleButton({ style, selected, onSelect, disabled }) {
+  return (
+    <button
+      onClick={() => !disabled && onSelect(style.value)}
+      disabled={disabled}
+      style={{
+        background: selected ? style.color : 'rgba(255,255,255,0.05)',
+        border: selected ? '2px solid white' : '2px solid rgba(255,255,255,0.1)',
+        borderRadius: '12px',
+        padding: '18px 12px',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '6px',
+        transition: 'all 0.15s ease',
+        transform: selected ? 'scale(1.06)' : 'scale(1)',
+        boxShadow: selected ? '0 0 20px rgba(255,255,255,0.2)' : 'none',
+        flex: 1,
+        opacity: disabled ? 0.5 : 1,
+      }}
+    >
+      <span style={{ fontSize: '28px' }}>{style.icon}</span>
+      <span style={{ fontWeight: 'bold', fontSize: '16px' }}>{style.label}</span>
+      <span style={{ fontSize: '11px', opacity: 0.7 }}>{style.sublabel}</span>
+    </button>
+  );
+}
+
+// ─── REVEAL ANIMATION ─────────────────────────────────────────────────────────
+function RevealPanel({ result }) {
+  if (!result) return null;
+  const colors = { wicket: '#7f1d1d', six: '#4c1d95', boundary: '#78350f', dot: '#1e293b', runs: '#14532d' };
+  const icons = { wicket: '💀', six: '💥', boundary: '🔥', dot: '🛡️', runs: '⚡' };
+  return (
+    <div style={{
+      background: colors[result.resultType] || '#1e293b',
+      border: '1px solid rgba(255,255,255,0.2)',
+      borderRadius: '16px',
+      padding: '24px',
+      textAlign: 'center',
+      animation: 'fadeIn 0.3s ease',
+    }}>
+      <div style={{ fontSize: '48px', marginBottom: '8px' }}>{icons[result.resultType]}</div>
+      <div style={{ fontSize: '28px', fontWeight: 'bold', marginBottom: '8px' }}>
+        {result.isWicket ? 'WICKET!' : result.runs === 6 ? 'SIX!' : result.runs === 4 ? 'FOUR!' : result.runs === 0 ? 'DOT' : `${result.runs} RUN${result.runs !== 1 ? 'S' : ''}`}
       </div>
-      <button onClick={() => onSave(field)} disabled={remaining !== 0} className="button primary" style={{ width: '100%' }}>
-        {remaining === 0 ? 'Confirm Field' : `Place ${remaining} more fielder${remaining !== 1 ? 's' : ''}`}
-      </button>
+      <div style={{ fontSize: '14px', opacity: 0.85, fontStyle: 'italic' }}>{result.commentary}</div>
     </div>
   );
 }
 
+// ─── MAIN MATCH COMPONENT ─────────────────────────────────────────────────────
 export default function Match({ lobbyData, matchId, leaveLobby }) {
   const { currentUser } = useAuth();
   const [matchData, setMatchData] = useState(null);
-
-  const [deliveryType, setDeliveryType] = useState('fast');
-  const [line, setLine] = useState('off');
-  const [shotType, setShotType] = useState('drive');
-  const [intent, setIntent] = useState('neutral');
-  const [batsmanDirection, setBatsmanDirection] = useState('off');
-  const [batsmanLoft, setBatsmanLoft] = useState('ground');
+  const [selectedRun, setSelectedRun] = useState(null);
+  const [selectedStyle, setSelectedStyle] = useState(null);
   const [loading, setLoading] = useState(false);
   const [timeLeft, setTimeLeft] = useState(ENGINE_CONFIG.TURN_TIMER_SEC);
-
-  // FIX: use ref to track current ball identity for timer — prevents timer reset on every snapshot
+  const [lastResult, setLastResult] = useState(null);
   const timerBallRef = useRef(null);
-  const commentaryVoiceRef = useRef(0);
-
   const imHost = lobbyData.hostId === currentUser.uid;
-
-  // VOICE COMMENTARY HOOK
-  useEffect(() => {
-    if (!matchData || !matchData.history) return;
-    const currentLen = matchData.history.length;
-    
-    // Only speak if length has strictly increased, and we are not on the initial mount load 
-    // (meaning someone actually played a new ball during this session)
-    if (currentLen > commentaryVoiceRef.current) {
-      if (commentaryVoiceRef.current !== 0) {
-        const latestCommentary = matchData.history[currentLen - 1]?.commentary;
-        if (latestCommentary && window.speechSynthesis) {
-           // Cancel any ongoing speech to keep it snappy and relevant
-           window.speechSynthesis.cancel();
-
-           const utterance = new SpeechSynthesisUtterance(latestCommentary);
-           utterance.rate = 1.0;
-           utterance.pitch = 1.1; // Make it sound slightly more energetic
-           
-           // Attempt to find an English voice
-           const voices = window.speechSynthesis.getVoices();
-           const enVoice = voices.find(v => v.name.includes('Google') || v.lang.includes('en-GB') || v.lang.includes('en-US'));
-           if (enVoice) utterance.voice = enVoice;
-
-           window.speechSynthesis.speak(utterance);
-        }
-      }
-      commentaryVoiceRef.current = currentLen;
-    }
-  }, [matchData?.history]);
 
   useEffect(() => {
     const unsub = onSnapshot(doc(db, 'matches', matchId), snap => {
-      if (snap.exists()) setMatchData(snap.data());
+      if (snap.exists()) {
+        const data = snap.data();
+        setMatchData(data);
+        // Show result when both inputs arrive and processing starts
+        if (data.lastResult) setLastResult(data.lastResult);
+      }
     });
     return () => unsub();
   }, [matchId]);
 
-  // TIMER — resets on new ball AND when field is set, giving full time for shots
+  // Timer — only resets on new ball
   useEffect(() => {
     if (!matchData || matchData.status !== 'in-progress') return;
     if (matchData.ballInput?.bowler && matchData.ballInput?.batsman) return;
-
-    const fieldStep = matchData.fieldSettings ? 'field-set' : 'field-unset';
-    const ballKey = `${matchData.innings}-${matchData.overNumber}-${matchData.ballNumber}-${fieldStep}`;
-    
-    if (timerBallRef.current === ballKey) return; // same state, don't reset
+    const ballKey = `${matchData.innings}-${matchData.overNumber}-${matchData.ballNumber}`;
+    if (timerBallRef.current === ballKey) return;
     timerBallRef.current = ballKey;
-
     setTimeLeft(ENGINE_CONFIG.TURN_TIMER_SEC);
+    setLastResult(null);
+    setSelectedRun(null);
+    setSelectedStyle(null);
     const interval = setInterval(() => {
       setTimeLeft(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          if (imHost) forceTimeoutActions(matchData);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(interval); if (imHost) forceTimeout(matchData); return 0; }
         return prev - 1;
       });
     }, 1000);
     return () => clearInterval(interval);
-  }, [matchData?.innings, matchData?.overNumber, matchData?.ballNumber, matchData?.status, matchData?.fieldSettings]);
+  }, [matchData?.innings, matchData?.overNumber, matchData?.ballNumber, matchData?.status]);
 
-  function forceTimeoutActions(m) {
+  function forceTimeout(m) {
     const updates = {};
-    if (!m.fieldSettings) {
-        // If field hasn't been set in time, auto-set so turn timer resets
-        updates.fieldSettings = randomFieldSettings();
-    } else {
-        // If field is set, default to random shots
-        if (!m.ballInput?.bowler) updates['ballInput.bowler'] = randomBowlingAction();
-        if (!m.ballInput?.batsman) updates['ballInput.batsman'] = randomBattingAction();
-    }
+    if (!m.ballInput?.bowler) updates['ballInput.bowler'] = randomBotBowling();
+    if (!m.ballInput?.batsman) updates['ballInput.batsman'] = randomBotBatting();
     if (Object.keys(updates).length > 0) updateDoc(doc(db, 'matches', matchId), updates);
   }
 
-  // AUTO-BOT: fires on host when it's a bot's turn
+  // Auto-bot actions
   useEffect(() => {
-    if (!matchData || !imHost || matchData.status !== 'in-progress') return;
-    if (matchData.processingResult || !matchData.fieldSettings) return;
+    if (!matchData || !imHost || matchData.status !== 'in-progress' || matchData.processingResult) return;
     const bIn = matchData.ballInput?.bowler;
     const batIn = matchData.ballInput?.batsman;
     const t = setTimeout(() => {
-      if (!bIn && matchData.currentBowlerId?.startsWith('bot_')) {
-        updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': randomBowlingAction() });
-      }
-      if (!batIn && matchData.strikerId?.startsWith('bot_')) {
-        updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': randomBattingAction() });
-      }
+      if (!bIn && matchData.currentBowlerId?.startsWith('bot_'))
+        updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': randomBotBowling() });
+      if (!batIn && matchData.strikerId?.startsWith('bot_'))
+        updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': randomBotBatting() });
     }, 800);
     return () => clearTimeout(t);
   }, [
     matchData?.status, matchData?.strikerId, matchData?.currentBowlerId,
     matchData?.ballNumber, matchData?.overNumber, matchData?.innings,
-    matchData?.processingResult,
-    !!matchData?.ballInput?.bowler, !!matchData?.ballInput?.batsman,
-    !!matchData?.fieldSettings,
+    matchData?.processingResult, !!matchData?.ballInput?.bowler, !!matchData?.ballInput?.batsman,
   ]);
 
-  // ENGINE EXECUTION — host only, guarded by processingResult lock
+  // Engine execution — host only
   useEffect(() => {
-    if (!matchData || !imHost || matchData.status !== 'in-progress') return;
-    if (matchData.processingResult) return;
+    if (!matchData || !imHost || matchData.status !== 'in-progress' || matchData.processingResult) return;
     const bIn = matchData.ballInput?.bowler;
     const batIn = matchData.ballInput?.batsman;
-    if (bIn && batIn) evaluateBall(matchData);
+    if (bIn && batIn) processBall(matchData);
   }, [matchData]);
 
-  // FIX: processingResult deadlock recovery — if stuck for >20s, host clears the flag
+  // Deadlock recovery
   useEffect(() => {
     if (!matchData || !imHost || !matchData.processingResult) return;
     const t = setTimeout(() => {
-      updateDoc(doc(db, 'matches', matchId), {
-        processingResult: false,
-        ballInput: { bowler: null, batsman: null }
-      });
+      updateDoc(doc(db, 'matches', matchId), { processingResult: false, ballInput: { bowler: null, batsman: null } });
     }, 20000);
     return () => clearTimeout(t);
   }, [matchData?.processingResult]);
 
-  async function evaluateBall(m) {
+  // Over-break timeout
+  useEffect(() => {
+    if (!matchData || matchData.status !== 'over-break' || !imHost) return;
+    const timer = setTimeout(() => {
+      const roster = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
+      const eligible = roster.filter(p => p.uid !== matchData.lastOverBowlerId);
+      const pool = eligible.length > 0 ? eligible : roster;
+      const pick = pool.find(p => !p.isBot) || pool[0];
+      if (pick) updateDoc(doc(db, 'matches', matchId), { status: 'in-progress', currentBowlerId: pick.uid });
+    }, ENGINE_CONFIG.TURN_TIMER_SEC * 1000);
+    return () => clearTimeout(timer);
+  }, [matchData?.status, matchData?.overNumber]);
+
+  // Toss bot auto-resolve
+  useEffect(() => {
+    if (!matchData || !imHost) return;
+    if (matchData.status === 'toss' && !matchData.tossCall) {
+      const callerCap = Object.values(lobbyData.players).find(p => p.team === matchData.tossCallerTeam && p.isCaptain);
+      if (callerCap?.isBot) {
+        const coinResult = Math.random() > 0.5 ? 'heads' : 'tails';
+        const winnerTeam = coinResult === 'heads' ? matchData.tossCallerTeam : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
+        const t = setTimeout(() => updateDoc(doc(db, 'matches', matchId), { tossCall: 'heads', tossCoinResult: coinResult, tossWinnerTeam: winnerTeam }), 800);
+        return () => clearTimeout(t);
+      }
+    }
+    if (matchData.status === 'toss' && matchData.tossWinnerTeam && !matchData.tossChoice) {
+      const winnerCap = Object.values(lobbyData.players).find(p => p.team === matchData.tossWinnerTeam && p.isCaptain);
+      if (winnerCap?.isBot) {
+        const t = setTimeout(() => submitTossChoice('bat', matchData), 1000);
+        return () => clearTimeout(t);
+      }
+    }
+  }, [matchData?.status, matchData?.tossCall, matchData?.tossWinnerTeam, matchData?.tossChoice]);
+
+  async function processBall(m) {
     await updateDoc(doc(db, 'matches', matchId), { processingResult: true });
+    const bowlStyle = m.ballInput.bowler.style;
+    const runAttempt = m.ballInput.batsman.runAttempt;
+    const pressure = isPressureOver(m.overNumber, m.totalOvers);
 
-    const bowlerIn = m.ballInput.bowler;
-    const batIn = m.ballInput.batsman;
-    let runs = 0, isWicket = false, wicketType = null, commentary = '';
+    let { runs, isWicket, wicketType, commentary, resultType } = evaluateOutcome(bowlStyle, runAttempt, pressure);
 
-    const accRoll = Math.random();
-    let accuracy = 'good';
-    if (accRoll > ENGINE_CONFIG.ACCURACY_PERFECT_THRESHOLD) accuracy = 'perfect';
-    else if (accRoll < ENGINE_CONFIG.ACCURACY_POOR_THRESHOLD) accuracy = 'poor';
-
-    const hasFielder = checkFielder(m.fieldSettings, batIn.direction, batIn.loft);
-    const lineMatch = bowlerIn.line === batIn.direction;
-
-    // Decision Engine Factors
-    const isCrossBatted = 
-      (bowlerIn.line === 'off' && batIn.direction === 'leg') || 
-      (bowlerIn.line === 'leg' && batIn.direction === 'off');
-      
-    const isShotMismatched = 
-      (batIn.shotType === 'pull' && bowlerIn.deliveryType !== 'bouncer' && bowlerIn.line === 'off') ||
-      (['drive', 'cover drive', 'straight drive'].includes(batIn.shotType) && bowlerIn.deliveryType === 'bouncer') ||
-      (batIn.shotType === 'cover drive' && bowlerIn.line !== 'off') ||
-      (batIn.shotType === 'straight drive' && bowlerIn.line !== 'middle') ||
-      (batIn.shotType === 'cut' && bowlerIn.line !== 'off') ||
-      (batIn.shotType === 'helicopter shot' && (bowlerIn.deliveryType === 'bouncer' || bowlerIn.deliveryType === 'spin')) ||
-      (batIn.shotType === 'sweep' && (bowlerIn.deliveryType === 'fast' || bowlerIn.deliveryType === 'bouncer' || bowlerIn.deliveryType === 'yorker')) ||
-      (batIn.shotType === 'scoop' && (bowlerIn.deliveryType === 'spin' || bowlerIn.deliveryType === 'yorker'));
-
-    // Base probabilities for wickets
-    let edgeProb = 0.01;
-    let lbwProb = 0.01;
-    let bowledProb = 0.01;
-    let caughtProb = 0.01;
-    let runOutProb = hasFielder ? 0.03 : 0.01;
-
-    // Modifiers based on delivery and shot
-    if (accuracy === 'perfect') {
-      edgeProb += 0.08;
-      bowledProb += 0.06;
-      lbwProb += 0.06;
+    // Consecutive limits
+    if (runs === 6 && (m.consecSixes || 0) >= ENGINE_CONFIG.CONSECUTIVE_LIMIT) {
+      runs = 4; commentary = 'One bounce over the rope — FOUR!'; resultType = 'boundary';
     }
-
-    if (isCrossBatted) {
-      edgeProb += 0.10;
-      lbwProb += 0.08;
-      bowledProb += 0.06;
-    }
-
-    if (isShotMismatched) {
-      edgeProb += 0.08;
-      caughtProb += 0.12;
-    }
-
-    if (batIn.intent === 'defend') {
-      edgeProb *= 0.3;
-      caughtProb *= 0; 
-      if (accuracy === 'perfect' && bowlerIn.deliveryType === 'yorker') {
-        bowledProb += 0.15;
-        lbwProb += 0.08;
-      }
-    } else if (batIn.intent === 'attack') {
-      edgeProb += 0.05;
-      bowledProb += 0.05;
-      if (bowlerIn.deliveryType === 'spin' && !lineMatch) {
-         caughtProb += 0.08;
-      }
-    }
-
-    if (accuracy === 'poor') {
-      edgeProb = 0;
-      bowledProb = 0;
-      lbwProb = 0;
-    }
-
-    const randWicket = Math.random();
-
-    if (randWicket < bowledProb) {
-       isWicket = true; wicketType = 'bowled'; commentary = 'Beaten by the pace and movement... Clean bowled!';
-    } else if (randWicket < bowledProb + lbwProb) {
-       isWicket = true; wicketType = 'lbw'; commentary = 'Struck on the pads right in front! Plumb LBW.';
-    } else if (randWicket < bowledProb + lbwProb + edgeProb) {
-       isWicket = true; wicketType = 'caught'; commentary = 'Finds the outside edge... safely taken by the keeper!';
-    } else if (batIn.loft === 'lofted' && hasFielder && Math.random() < 0.25 + caughtProb) {
-       isWicket = true; wicketType = 'caught'; commentary = 'Lofted straight down the throat of the fielder! CAUGHT!';
-    }
-
-    let shotQuality = 'good';
-    if (!isWicket) {
-      if (batIn.intent === 'defend') {
-        runs = 0; commentary = 'Solidly defended, no run.';
-        shotQuality = 'defended';
-      } else {
-        const excellentConnection = (accuracy === 'poor') || (!isCrossBatted && !isShotMismatched && accuracy !== 'perfect');
-        
-        if (excellentConnection) {
-          shotQuality = 'perfect';
-          let shotNameDisplay = batIn.shotType.replace(/\b\w/g, l => l.toUpperCase());
-          if (batIn.loft === 'lofted') {
-             runs = hasFielder ? 2 : 6;
-             commentary = runs === 6 ? `Cracked! Fantastic ${shotNameDisplay} over ${batIn.direction}! SIX!` : `Lofted ${shotNameDisplay} into the deep, cuts it off for 2.`;
-          } else {
-             runs = hasFielder ? 1 : 4;
-             commentary = runs === 4 ? `Beautiful ${shotNameDisplay}! Pierces the gap for FOUR!` : `Played safely to the fielder, single taken.`;
-          }
-        } else {
-          shotQuality = 'mistimed';
-          if (batIn.loft === 'lofted') {
-             runs = 1; commentary = `Mistimed overhead. Fails to clear the infield properly, just a single.`;
-          } else {
-             runs = hasFielder ? 0 : 1; 
-             commentary = runs === 0 ? `Misplayed straight to the fielder. No run.` : `Scratches around for a single.`;
-          }
-        }
-
-        if (runs >= 0 && Math.random() < runOutProb && batIn.intent !== 'defend') {
-           isWicket = true; wicketType = 'run out'; runs = 0; commentary = 'Mix up in the middle... direct hit! RUN OUT!';
-        }
-      }
-    } else {
-        shotQuality = 'missed/edged';
-    }
-
-    // Balance control
-    if (runs === 6 && (m.consecSixes || 0) >= ENGINE_CONFIG.CONSECUTIVE_LIMIT) { runs = 4; commentary = 'One bounce over the rope for four.'; }
-    if (isWicket && (m.consecWickets || 0) >= ENGINE_CONFIG.CONSECUTIVE_LIMIT) { 
-      isWicket = false; 
-      runs = wicketType === 'run out' ? 0 : 1; 
-      commentary = wicketType === 'run out' ? 'Direct hit! But wait, umpire says NOT OUT!' : 'Edged... falls short of slip! Single taken.'; 
-      wicketType = null;
+    if (isWicket && (m.consecWickets || 0) >= ENGINE_CONFIG.CONSECUTIVE_LIMIT) {
+      isWicket = false; runs = 1; commentary = 'Edged but falls short! Single taken.'; resultType = 'runs'; wicketType = null;
     }
 
     const consecSixes = runs === 6 ? (m.consecSixes || 0) + 1 : 0;
     const consecWickets = isWicket ? (m.consecWickets || 0) + 1 : 0;
-
-    const resultRecord = {
-      bowler: bowlerIn, batsman: batIn, runs, isWicket, wicketType, commentary,
-      debug: { lineMatch, accuracy, shotQuality, hasFielder, intent: batIn.intent }
-    };
+    const resultRecord = { bowlStyle, runAttempt, runs, isWicket, wicketType, commentary, resultType, pressure };
 
     let nextScore = m.score + runs;
     let nextWickets = m.wickets + (isWicket ? 1 : 0);
@@ -465,25 +381,17 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     let swappedStriker = m.strikerId;
     let swappedNonStriker = m.nonStrikerId;
 
-    if (runs % 2 !== 0 && m.nonStrikerId) {
-      swappedStriker = m.nonStrikerId;
-      swappedNonStriker = m.strikerId;
-    }
+    if (runs % 2 !== 0 && m.nonStrikerId) { swappedStriker = m.nonStrikerId; swappedNonStriker = m.strikerId; }
     if (nextBall === 6) {
       nextBall = 0; nextOver += 1; overComplete = true;
-      if (m.nonStrikerId) {
-        const tmp = swappedStriker; swappedStriker = swappedNonStriker; swappedNonStriker = tmp;
-      }
+      if (m.nonStrikerId) { const tmp = swappedStriker; swappedStriker = swappedNonStriker; swappedNonStriker = tmp; }
     }
 
     const nextOutPlayers = [...(m.outPlayers || [])];
     if (isWicket) nextOutPlayers.push(m.strikerId);
 
-    // FIX: evaluate endOfInnings before matchEnded so both can't conflict
     const maxWickets = m.lastManStand ? m.teamLists[m.battingTeam].length : Math.max(1, m.teamLists[m.battingTeam].length - 1);
     const endOfInnings = nextWickets >= maxWickets || nextOver >= m.totalOvers;
-
-    // FIX: tie is when innings 2 ends with scores level, not score math on target
     const chaseSucceeded = m.innings === 2 && nextScore >= m.target;
     const chaseFailed = m.innings === 2 && endOfInnings && nextScore < m.target;
     const isTie = m.innings === 2 && endOfInnings && nextScore === m.target - 1 && !chaseSucceeded;
@@ -494,60 +402,40 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         status: isTie ? 'completed-tie' : 'completed',
         score: nextScore, wickets: nextWickets,
         history: [...(m.history || []), resultRecord],
-        ballInput: { bowler: null, batsman: null },
-        processingResult: false
-      });
-      return;
+        lastResult: resultRecord,
+        ballInput: { bowler: null, batsman: null }, processingResult: false
+      }); return;
     }
-
     if (endOfInnings) {
       await updateDoc(doc(db, 'matches', matchId), {
-        status: 'setup', setupReason: 'innings-break',
-        innings: 2,
-        battingTeam: m.bowlingTeam, bowlingTeam: m.battingTeam,
-        target: nextScore + 1,
-        score: 0, wickets: 0, ballNumber: 0, overNumber: 0, outPlayers: [],
-        strikerId: null, nonStrikerId: null, currentBowlerId: null,
+        innings: 2, battingTeam: m.bowlingTeam, bowlingTeam: m.battingTeam,
+        target: nextScore + 1, score: 0, wickets: 0, ballNumber: 0, overNumber: 0, outPlayers: [],
+        strikerId: m.teamLists[m.bowlingTeam][0],
+        nonStrikerId: m.teamLists[m.bowlingTeam].length > 1 ? m.teamLists[m.bowlingTeam][1] : null,
+        currentBowlerId: m.teamLists[m.battingTeam][0],
         history: [...(m.history || []), resultRecord],
+        lastResult: resultRecord,
         ballInput: { bowler: null, batsman: null },
-        fieldSettings: null, consecSixes: 0, consecWickets: 0,
-        processingResult: false
-      });
-      return;
+        consecSixes: 0, consecWickets: 0, processingResult: false
+      }); return;
     }
 
     let nextStriker = swappedStriker;
     if (isWicket) {
-      nextStriker = null; // Forces batting captain to manually assign next batsman
+      const avail = m.teamLists[m.battingTeam].filter(id => !nextOutPlayers.includes(id) && id !== swappedNonStriker);
+      nextStriker = avail.length > 0 ? avail[0] : null;
     }
 
     if (overComplete) {
       await updateDoc(doc(db, 'matches', matchId), {
-        status: 'setup', setupReason: isWicket ? 'over-complete-wicket' : 'over-break',
-        score: nextScore, wickets: nextWickets, ballNumber: 0, overNumber: nextOver,
-        strikerId: nextStriker, nonStrikerId: swappedNonStriker,
-        outPlayers: nextOutPlayers, lastOverBowlerId: m.currentBowlerId,
-        currentBowlerId: null, // Forces bowling captain to pick next bowler
+        status: 'over-break', score: nextScore, wickets: nextWickets, ballNumber: 0, overNumber: nextOver,
+        strikerId: nextStriker, nonStrikerId: swappedNonStriker, outPlayers: nextOutPlayers,
+        lastOverBowlerId: m.currentBowlerId,
         history: [...(m.history || []), resultRecord],
-        ballInput: { bowler: null, batsman: null },
-        fieldSettings: null, consecSixes, consecWickets,
-        processingResult: false
-      });
-      return;
-    }
-
-    if (isWicket) {
-      await updateDoc(doc(db, 'matches', matchId), {
-        status: 'setup', setupReason: 'wicket-fallen',
-        score: nextScore, wickets: nextWickets, ballNumber: nextBall, overNumber: nextOver,
-        strikerId: null, nonStrikerId: swappedNonStriker,
-        outPlayers: nextOutPlayers, lastOverBowlerId: m.lastOverBowlerId || null,
-        currentBowlerId: m.currentBowlerId,
-        history: [...(m.history || []), resultRecord],
+        lastResult: resultRecord,
         ballInput: { bowler: null, batsman: null },
         consecSixes, consecWickets, processingResult: false
-      });
-      return;
+      }); return;
     }
 
     await updateDoc(doc(db, 'matches', matchId), {
@@ -556,31 +444,27 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       currentBowlerId: m.currentBowlerId, lastOverBowlerId: m.lastOverBowlerId || null,
       outPlayers: nextOutPlayers,
       history: [...(m.history || []), resultRecord],
+      lastResult: resultRecord,
       ballInput: { bowler: null, batsman: null },
       consecSixes, consecWickets, processingResult: false
-      // fieldSettings intentionally not reset — persists within an over
     });
   }
 
-  async function submitBowlingAction(e) {
-    if (e) e.preventDefault();
-    if (matchData.currentBowlerId !== currentUser.uid) return alert('Anti-cheat: You are not the active bowler.');
-    if (matchData.ballInput?.bowler) return; // already submitted
+  async function submitBowling() {
+    if (!selectedStyle || loading) return;
+    if (matchData.currentBowlerId !== currentUser.uid) return;
+    if (matchData.ballInput?.bowler) return;
     setLoading(true);
-    await updateDoc(doc(db, 'matches', matchId), {
-      'ballInput.bowler': { deliveryType, line, submittedBy: currentUser.uid }
-    });
+    await updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': { style: selectedStyle, submittedBy: currentUser.uid } });
     setLoading(false);
   }
 
-  async function submitBattingAction(e) {
-    if (e) e.preventDefault();
-    if (matchData.strikerId !== currentUser.uid) return alert('Anti-cheat: You are not the active striker.');
-    if (matchData.ballInput?.batsman) return; // already submitted
+  async function submitBatting() {
+    if (selectedRun === null || loading) return;
+    if (matchData.strikerId !== currentUser.uid) return;
+    if (matchData.ballInput?.batsman) return;
     setLoading(true);
-    await updateDoc(doc(db, 'matches', matchId), {
-      'ballInput.batsman': { shotType, intent, direction: batsmanDirection, loft: batsmanLoft, submittedBy: currentUser.uid }
-    });
+    await updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': { runAttempt: selectedRun, submittedBy: currentUser.uid } });
     setLoading(false);
   }
 
@@ -588,230 +472,80 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     await updateDoc(doc(db, 'matches', matchId), { status: 'in-progress', currentBowlerId: uid });
   }
 
-  async function saveFieldSettings(field) {
-    // Only the bowling captain sets the field
-    if (!amBowlingCaptain) return;
-    await updateDoc(doc(db, 'matches', matchId), { fieldSettings: field });
-  }
-
   async function submitTossCall(call) {
-    // Called by Team A's captain — 'heads' or 'tails'
     const coinResult = Math.random() > 0.5 ? 'heads' : 'tails';
     const winnerTeam = coinResult === call ? matchData.tossCallerTeam : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
-    await updateDoc(doc(db, 'matches', matchId), {
-      tossCall: call,
-      tossCoinResult: coinResult,
-      tossWinnerTeam: winnerTeam,
-    });
+    await updateDoc(doc(db, 'matches', matchId), { tossCall: call, tossCoinResult: coinResult, tossWinnerTeam: winnerTeam });
   }
 
-  async function submitTossChoice(choice, currentMatchData) {
-    // choice: 'bat' or 'bowl'. currentMatchData passed explicitly to avoid stale closure.
-    const m = currentMatchData || matchData;
-    const batFirst = choice === 'bat' ? m.tossWinnerTeam : (m.tossWinnerTeam === 'A' ? 'B' : 'A');
+  async function submitTossChoice(choice, m) {
+    const md = m || matchData;
+    const batFirst = choice === 'bat' ? md.tossWinnerTeam : (md.tossWinnerTeam === 'A' ? 'B' : 'A');
     const bowlFirst = batFirst === 'A' ? 'B' : 'A';
+    const teamAIds = md.teamLists.A;
+    const teamBIds = md.teamLists.B;
     await updateDoc(doc(db, 'matches', matchId), {
-      status: 'setup', setupReason: 'innings-break',
-      tossChoice: choice,
-      innings: 1,
+      status: 'in-progress', tossChoice: choice, innings: 1,
       battingTeam: batFirst, bowlingTeam: bowlFirst,
       score: 0, wickets: 0, target: null, ballNumber: 0, overNumber: 0,
-      strikerId: null,
-      nonStrikerId: null,
-      currentBowlerId: null,
-      outPlayers: [],
+      strikerId: batFirst === 'A' ? teamAIds[0] : teamBIds[0],
+      nonStrikerId: batFirst === 'A' ? (teamAIds.length > 1 ? teamAIds[1] : null) : (teamBIds.length > 1 ? teamBIds[1] : null),
+      currentBowlerId: bowlFirst === 'A' ? teamAIds[0] : teamBIds[0],
     });
   }
-
-  // Auto-resolve toss for bots — uses matchData from snapshot to avoid stale closure
-  useEffect(() => {
-    if (!matchData || !imHost) return;
-
-    // Phase 1: auto-call if Team A captain is a bot
-    if (matchData.status === 'toss' && !matchData.tossCall) {
-      const callerCap = Object.values(lobbyData.players).find(
-        p => p.team === matchData.tossCallerTeam && p.isCaptain
-      );
-      if (callerCap?.isBot) {
-        const coinResult = Math.random() > 0.5 ? 'heads' : 'tails';
-        const winnerTeam = coinResult === 'heads'
-          ? matchData.tossCallerTeam
-          : (matchData.tossCallerTeam === 'A' ? 'B' : 'A');
-        const t = setTimeout(() => {
-          updateDoc(doc(db, 'matches', matchId), {
-            tossCall: 'heads',
-            tossCoinResult: coinResult,
-            tossWinnerTeam: winnerTeam,
-          });
-        }, 800);
-        return () => clearTimeout(t);
-      }
-    }
-
-    // Phase 2: auto-choose bat/bowl if winner captain is a bot
-    if (matchData.status === 'toss' && matchData.tossWinnerTeam && !matchData.tossChoice) {
-      const winnerCap = Object.values(lobbyData.players).find(
-        p => p.team === matchData.tossWinnerTeam && p.isCaptain
-      );
-      if (winnerCap?.isBot) {
-        const t = setTimeout(() => submitTossChoice('bat', matchData), 1000);
-        return () => clearTimeout(t);
-      }
-    }
-  }, [matchData?.status, matchData?.tossCall, matchData?.tossWinnerTeam, matchData?.tossChoice]);
-
-  // FIX: auto-set field for bot captain
-  useEffect(() => {
-    if (!matchData || !imHost || matchData.status !== 'in-progress') return;
-    if (matchData.fieldSettings) return;
-    
-    const bowlCap = Object.values(lobbyData.players).find(p => p.team === matchData.bowlingTeam && p.isCaptain);
-    
-    // Auto-set if the bowling captain is a bot
-    if (bowlCap?.isBot) {
-      updateDoc(doc(db, 'matches', matchId), { fieldSettings: randomFieldSettings() });
-    }
-  }, [matchData?.status, matchData?.ballNumber, matchData?.overNumber, matchData?.innings, matchData?.fieldSettings, matchData?.bowlingTeam]);
-
-  // Setup completion transition
-  useEffect(() => {
-    if (!matchData || !imHost || matchData.status !== 'setup') return;
-    const teamSize = matchData.teamLists[matchData.battingTeam].length;
-    const outCount = matchData.outPlayers?.length || 0;
-    const lastManStanding = matchData.lastManStand && (teamSize - outCount <= 1);
-    const needsNonStriker = (teamSize > 1 && !matchData.nonStrikerId && !lastManStanding);
-    if (matchData.currentBowlerId && matchData.strikerId && !needsNonStriker) {
-       updateDoc(doc(db, 'matches', matchId), { status: 'in-progress', setupReason: null });
-    }
-  }, [matchData]);
-
-  // SETUP TIMEOUT and AUTO-BOT logic — prevents soft-lock if captains are AFK or bots
-  useEffect(() => {
-    if (!matchData || matchData.status !== 'setup' || !imHost) return;
-
-    const bowlCap = Object.values(lobbyData.players).find(p => p.team === matchData.bowlingTeam && p.isCaptain);
-    const batCap = Object.values(lobbyData.players).find(p => p.team === matchData.battingTeam && p.isCaptain);
-
-    let bowlTimer = null;
-    let batTimer = null;
-
-    if (!matchData.currentBowlerId) {
-      const delay = bowlCap?.isBot ? 1000 : ENGINE_CONFIG.TURN_TIMER_SEC * 1000;
-      bowlTimer = setTimeout(() => {
-        const roBowl = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
-        const eligibleB = roBowl.filter(p => p.uid !== matchData.lastOverBowlerId);
-        const picked = (eligibleB.length > 0 ? eligibleB : roBowl)[0]?.uid || matchData.teamLists[matchData.bowlingTeam][0];
-        updateDoc(doc(db, 'matches', matchId), { currentBowlerId: picked });
-      }, delay);
-    }
-
-    const needsBatsman = !matchData.strikerId || (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1);
-    if (needsBatsman) {
-      const delay = batCap?.isBot ? 1000 : ENGINE_CONFIG.TURN_TIMER_SEC * 1000;
-      batTimer = setTimeout(() => {
-        const updates = {};
-        if (!matchData.strikerId) {
-          const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.nonStrikerId);
-          if (avail.length > 0) updates.strikerId = avail[0];
-        }
-        if (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1) {
-          const avail = matchData.teamLists[matchData.battingTeam].filter(id => !matchData.outPlayers?.includes(id) && id !== matchData.strikerId && id !== updates.strikerId);
-          if (avail.length > 0) updates.nonStrikerId = avail[0];
-        }
-        if (Object.keys(updates).length > 0) updateDoc(doc(db, 'matches', matchId), updates);
-      }, delay);
-    }
-
-    return () => {
-      if (bowlTimer) clearTimeout(bowlTimer);
-      if (batTimer) clearTimeout(batTimer);
-    };
-  }, [matchData?.status, matchData?.strikerId, matchData?.nonStrikerId, matchData?.currentBowlerId]);
 
   if (!matchData) return <div className="container center" style={{ color: 'white' }}>Loading Match...</div>;
 
-  // Derived state — computed after null guard
   const isMyTurnToBowl = matchData.currentBowlerId === currentUser.uid;
   const isMyTurnToBat = matchData.strikerId === currentUser.uid;
-  const amBowlingCaptain = !!Object.values(lobbyData.players).find(
-    p => p.uid === currentUser.uid && p.team === matchData.bowlingTeam && p.isCaptain
-  );
-  const fieldIsSet = !!matchData.fieldSettings;
+  const amBowlingCaptain = !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.bowlingTeam && p.isCaptain);
   const strikerName = resolveName(matchData.strikerId, lobbyData);
+  const nonStrikerName = resolveName(matchData.nonStrikerId, lobbyData);
   const bowlerName = resolveName(matchData.currentBowlerId, lobbyData);
+  const pressure = matchData.overNumber !== undefined && isPressureOver(matchData.overNumber, matchData.totalOvers);
+  const bothLocked = !!(matchData.ballInput?.bowler && matchData.ballInput?.batsman);
 
-  // ── TOSS SCREEN ──────────────────────────────────────────────────────────────
+  // ── TOSS ─────────────────────────────────────────────────────────────────────
   if (matchData.status === 'toss') {
     const callerTeamName = matchData.tossCallerTeam === 'A' ? lobbyData.teamAName : lobbyData.teamBName;
-    const iAmCaller = !!Object.values(lobbyData.players).find(
-      p => p.uid === currentUser.uid && p.team === matchData.tossCallerTeam && p.isCaptain
-    );
+    const iAmCaller = !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.tossCallerTeam && p.isCaptain);
     const coinFlipped = !!matchData.tossCoinResult;
     const winnerTeamName = matchData.tossWinnerTeam === 'A' ? lobbyData.teamAName : lobbyData.teamBName;
-    const iAmWinner = !!Object.values(lobbyData.players).find(
-      p => p.uid === currentUser.uid && p.team === matchData.tossWinnerTeam && p.isCaptain
-    );
-
+    const iAmWinner = !!Object.values(lobbyData.players).find(p => p.uid === currentUser.uid && p.team === matchData.tossWinnerTeam && p.isCaptain);
     return (
       <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '24px', maxWidth: '480px' }}>
-        <div style={{ background: 'var(--card-bg)', padding: '30px', borderRadius: '12px', width: '100%' }}>
-          <div style={{ fontSize: '64px', marginBottom: '10px' }}>🪙</div>
+        <div style={{ background: 'var(--card-bg)', padding: '30px', borderRadius: '16px', width: '100%', border: '1px solid rgba(255,255,255,0.1)' }}>
+          <div style={{ fontSize: '72px', marginBottom: '12px' }}>🪙</div>
           <h2 style={{ margin: '0 0 20px' }}>The Toss</h2>
-
-          {/* Phase 1 — caller picks heads or tails */}
-          {!coinFlipped && (
+          {!coinFlipped ? (
             <>
               <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>
                 <strong style={{ color: 'white' }}>{callerTeamName}</strong> captain calls the toss
               </p>
               {iAmCaller ? (
-                <>
-                  <p style={{ marginBottom: '14px' }}>Call it:</p>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={() => submitTossCall('heads')} className="button primary" style={{ flex: 1, fontSize: '20px' }}>🪙 Heads</button>
-                    <button onClick={() => submitTossCall('tails')} className="button secondary" style={{ flex: 1, fontSize: '20px' }}>🔄 Tails</button>
-                  </div>
-                </>
-              ) : (
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  Waiting for <strong style={{ color: 'white' }}>{callerTeamName}</strong> captain to call...
-                </p>
-              )}
-            </>
-          )}
-
-          {/* Phase 2 — coin flipped, show result, winner chooses */}
-          {coinFlipped && (
-            <>
-              <div style={{ marginBottom: '16px' }}>
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  {callerTeamName} called <strong style={{ color: 'white', textTransform: 'capitalize' }}>{matchData.tossCall}</strong>
-                </p>
-                <p style={{ fontSize: '22px', marginBottom: '6px' }}>
-                  Coin landed on{' '}
-                  <strong style={{ color: matchData.tossCoinResult === matchData.tossCall ? 'var(--success-color)' : 'var(--error-color)', textTransform: 'capitalize' }}>
-                    {matchData.tossCoinResult}
-                  </strong>
-                </p>
-                <div style={{ background: 'rgba(255,255,255,0.06)', padding: '12px', borderRadius: '8px', marginTop: '10px' }}>
-                  <span style={{ color: 'gold', fontWeight: 'bold', fontSize: '18px' }}>{winnerTeamName}</span>
-                  <span> wins the toss!</span>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button onClick={() => submitTossCall('heads')} className="button primary" style={{ flex: 1, fontSize: '18px' }}>🪙 Heads</button>
+                  <button onClick={() => submitTossCall('tails')} className="button secondary" style={{ flex: 1, fontSize: '18px' }}>🔄 Tails</button>
                 </div>
+              ) : <p style={{ color: 'var(--text-secondary)' }}>Waiting for {callerTeamName} captain to call...</p>}
+            </>
+          ) : (
+            <>
+              <p style={{ color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                {callerTeamName} called <strong style={{ color: 'white', textTransform: 'capitalize' }}>{matchData.tossCall}</strong>
+              </p>
+              <p style={{ fontSize: '22px', marginBottom: '12px' }}>
+                Coin: <strong style={{ color: matchData.tossCoinResult === matchData.tossCall ? 'var(--success-color)' : 'var(--error-color)', textTransform: 'capitalize' }}>{matchData.tossCoinResult}</strong>
+              </p>
+              <div style={{ background: 'rgba(255,215,0,0.1)', border: '1px solid gold', padding: '12px', borderRadius: '8px', marginBottom: '20px' }}>
+                <span style={{ color: 'gold', fontWeight: 'bold', fontSize: '18px' }}>{winnerTeamName} wins the toss!</span>
               </div>
-
               {iAmWinner ? (
-                <>
-                  <p style={{ marginBottom: '14px' }}>Choose to bat or bowl first:</p>
-                  <div style={{ display: 'flex', gap: '12px' }}>
-                    <button onClick={() => submitTossChoice('bat', matchData)} className="button primary" style={{ flex: 1 }}>🏏 Bat First</button>
-                    <button onClick={() => submitTossChoice('bowl', matchData)} className="button secondary" style={{ flex: 1 }}>🎳 Bowl First</button>
-                  </div>
-                </>
-              ) : (
-                <p style={{ color: 'var(--text-secondary)' }}>
-                  Waiting for <strong style={{ color: 'white' }}>{winnerTeamName}</strong> captain to choose...
-                </p>
-              )}
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button onClick={() => submitTossChoice('bat', matchData)} className="button primary" style={{ flex: 1 }}>🏏 Bat First</button>
+                  <button onClick={() => submitTossChoice('bowl', matchData)} className="button secondary" style={{ flex: 1 }}>🎳 Bowl First</button>
+                </div>
+              ) : <p style={{ color: 'var(--text-secondary)' }}>Waiting for {winnerTeamName} captain to choose...</p>}
             </>
           )}
         </div>
@@ -823,34 +557,33 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   // ── MATCH SUMMARY ─────────────────────────────────────────────────────────────
   if (matchData.status === 'completed' || matchData.status === 'completed-tie') {
     const isTie = matchData.status === 'completed-tie';
-    // FIX: determine and display the winner explicitly
     let resultLine = 'Match Tied!';
     if (!isTie) {
       const battingWon = matchData.innings === 2 && matchData.score >= matchData.target;
       const winningTeam = battingWon ? matchData.battingTeam : matchData.bowlingTeam;
       const winningTeamName = winningTeam === 'A' ? lobbyData.teamAName : lobbyData.teamBName;
       if (battingWon) {
-        const maxWicketsWin = matchData.lastManStand ? matchData.teamLists[winningTeam].length : Math.max(1, matchData.teamLists[winningTeam].length - 1);
-        const wicketsLeft = maxWicketsWin - matchData.wickets;
+        const wicketsLeft = matchData.teamLists[winningTeam].length - 1 - matchData.wickets;
         resultLine = `${winningTeamName} won by ${wicketsLeft} wicket${wicketsLeft !== 1 ? 's' : ''}!`;
       } else {
         const runMargin = matchData.target - 1 - matchData.score;
-        resultLine = `${winningTeamName} won by ${runMargin} run${runMargin !== 1 ? 's' : ''}!`;
+        resultLine = `${winningTeam === 'A' ? lobbyData.teamBName : lobbyData.teamAName} won by ${runMargin} run${runMargin !== 1 ? 's' : ''}!`;
       }
     }
     return (
       <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '600px' }}>
-        <h1 style={{ color: 'gold' }}>{resultLine}</h1>
-        <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', width: '100%' }}>
-          <h2>Target: {matchData.target}</h2>
-          <h1 style={{ color: 'var(--primary-color)' }}>Final Score: {matchData.score} / {matchData.wickets}</h1>
-          <p>Overs: {matchData.overNumber}.{matchData.ballNumber}</p>
+        <div style={{ background: 'linear-gradient(135deg, #1a1a2e, #16213e)', border: '1px solid rgba(255,215,0,0.3)', padding: '30px', borderRadius: '16px', width: '100%' }}>
+          <div style={{ fontSize: '56px', marginBottom: '12px' }}>🏆</div>
+          <h1 style={{ color: 'gold', marginBottom: '8px' }}>{resultLine}</h1>
+          <p style={{ color: 'var(--text-secondary)' }}>Final: {matchData.score}/{matchData.wickets} | Overs: {matchData.overNumber}.{matchData.ballNumber}</p>
+          {matchData.target && <p style={{ color: 'var(--text-secondary)' }}>Target was {matchData.target}</p>}
         </div>
-        <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', width: '100%', maxHeight: '300px', overflowY: 'auto', textAlign: 'left' }}>
-          <h3>Ball-by-Ball</h3>
+        <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '12px', width: '100%', maxHeight: '280px', overflowY: 'auto', textAlign: 'left' }}>
+          <h3 style={{ marginBottom: '12px' }}>Ball-by-Ball</h3>
           {(matchData.history || []).map((h, i) => (
-            <div key={i} style={{ padding: '5px 0', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-              <span style={{ color: 'var(--primary-color)' }}>[Ball {i + 1}]</span> {h.commentary}
+            <div key={i} style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)', display: 'flex', gap: '10px', alignItems: 'center' }}>
+              <span style={{ color: 'var(--text-secondary)', fontSize: '12px', minWidth: '50px' }}>Ball {i + 1}</span>
+              <span style={{ color: h.isWicket ? '#ef4444' : h.runs >= 4 ? '#fbbf24' : 'white', fontSize: '13px' }}>{h.commentary}</span>
             </div>
           ))}
         </div>
@@ -859,237 +592,179 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     );
   }
 
-  // ── SETUP (Innings Break, Wicket, Over Break) ─────────────────────────────────
-  if (matchData.status === 'setup') {
-    const batRoster = Object.values(lobbyData.players).filter(p => p.team === matchData.battingTeam);
-    const bowlRoster = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
-    
-    const eligibleBowlers = bowlRoster.filter(p => p.uid !== matchData.lastOverBowlerId);
-    const bowlPool = eligibleBowlers.length > 0 ? eligibleBowlers : bowlRoster;
-
-    const availBatsmen = batRoster.filter(p => !matchData.outPlayers?.includes(p.uid));
-
-    const amBattingCaptain = !!batRoster.find(p => p.uid === currentUser.uid && p.isCaptain);
-    const amBowlingCaptain = !!bowlRoster.find(p => p.uid === currentUser.uid && p.isCaptain);
-
-    let title = "Match Setup";
-    if (matchData.setupReason === 'innings-break') title = `Innings ${matchData.innings} Start`;
-    if (matchData.setupReason === 'wicket-fallen') title = "Wicket Fallen!";
-    if (matchData.setupReason === 'over-break') title = "Over Complete!";
-    if (matchData.setupReason === 'over-complete-wicket') title = "Over Complete & Wicket!";
-
-    async function pickStriker(uid) { await updateDoc(doc(db, 'matches', matchId), { strikerId: uid }); }
-    async function pickNonStriker(uid) { await updateDoc(doc(db, 'matches', matchId), { nonStrikerId: uid }); }
-    async function pickBowler(uid) { await updateDoc(doc(db, 'matches', matchId), { currentBowlerId: uid }); }
-
+  // ── OVER BREAK ────────────────────────────────────────────────────────────────
+  if (matchData.status === 'over-break') {
+    const roster = Object.values(lobbyData.players).filter(p => p.team === matchData.bowlingTeam);
+    const eligible = roster.filter(p => p.uid !== matchData.lastOverBowlerId);
+    const bowlerList = eligible.length > 0 ? eligible : roster;
     return (
-      <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '800px' }}>
-        <h2>{title}</h2>
-        <p>Score: {matchData.score} / {matchData.wickets}</p>
-        
-        <div className="flex-row-responsive" style={{ flexWrap: 'wrap', justifyContent: 'center' }}>
-          
-          {/* Bowling Selection */}
-          {!matchData.currentBowlerId && (
-             <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', flex: '1 1 300px' }}>
-               <h3 style={{ color: 'var(--primary-color)' }}>Select Bowler</h3>
-               {amBowlingCaptain ? (
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                   {bowlPool.map(p => (
-                     <div key={p.uid} style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                       <span style={{flex: 1}}>{p.name}</span>
-                       <button onClick={() => pickBowler(p.uid)} className="button primary" style={{padding: '5px 10px'}}>Select</button>
-                     </div>
-                   ))}
-                 </div>
-               ) : (
-                 <p style={{ color: 'orange' }}>Waiting for bowling captain...</p>
-               )}
-             </div>
-          )}
-
-          {/* Batting Selection (New Striker/Openers) */}
-          {(!matchData.strikerId || (!matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1 && !(matchData.lastManStand && matchData.teamLists[matchData.battingTeam].length - (matchData.outPlayers?.length || 0) <= 1))) && (
-             <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', flex: '1 1 300px' }}>
-               <h3 style={{ color: 'gold' }}>Select Batsmen</h3>
-               {amBattingCaptain ? (
-                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                   {!matchData.strikerId && <p style={{ margin: '5px 0' }}>Pick Striker:</p>}
-                   {!matchData.strikerId && availBatsmen.filter(p => p.uid !== matchData.nonStrikerId).map(p => (
-                     <button key={p.uid} onClick={() => pickStriker(p.uid)} className="button primary">{p.name}</button>
-                   ))}
-                   {matchData.strikerId && !matchData.nonStrikerId && matchData.teamLists[matchData.battingTeam].length > 1 && !(matchData.lastManStand && matchData.teamLists[matchData.battingTeam].length - (matchData.outPlayers?.length || 0) <= 1) && (
-                      <>
-                        <p style={{ margin: '5px 0' }}>Pick Non-Striker:</p>
-                        {availBatsmen.filter(p => p.uid !== matchData.strikerId).map(p => (
-                          <button key={p.uid} onClick={() => pickNonStriker(p.uid)} className="button primary">{p.name}</button>
-                        ))}
-                      </>
-                   )}
-                 </div>
-               ) : (
-                 <p style={{ color: 'orange' }}>Waiting for batting captain...</p>
-               )}
-             </div>
-          )}
-
+      <div className="container center text-center" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '480px' }}>
+        <div style={{ background: 'var(--card-bg)', padding: '24px', borderRadius: '16px', width: '100%' }}>
+          <h2 style={{ marginBottom: '6px' }}>Over Complete</h2>
+          <p style={{ color: 'var(--text-secondary)', marginBottom: '20px' }}>Score: {matchData.score}/{matchData.wickets}</p>
+          <h3 style={{ marginBottom: '12px' }}>Select Next Bowler</h3>
+          {amBowlingCaptain || imHost ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {bowlerList.map(p => (
+                <button key={p.uid} onClick={() => submitNextBowler(p.uid)} className="button primary" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  {p.isBot ? '🤖' : '👤'} {p.name} {p.isCaptain ? '[C]' : ''}
+                </button>
+              ))}
+            </div>
+          ) : <p style={{ color: 'var(--text-secondary)' }}>Waiting for bowling captain...</p>}
         </div>
       </div>
     );
   }
 
-  // ── IN-PROGRESS MATCH UI ──────────────────────────────────────────────────────
+  // ── IN-PROGRESS ───────────────────────────────────────────────────────────────
+  const timerColor = timeLeft <= 5 ? '#ef4444' : timeLeft <= 10 ? '#f59e0b' : 'white';
+  const teamAName = lobbyData.teamAName;
+  const teamBName = lobbyData.teamBName;
+  const battingTeamName = matchData.battingTeam === 'A' ? teamAName : teamBName;
+  const bowlingTeamName = matchData.bowlingTeam === 'A' ? teamAName : teamBName;
+
   return (
-    <div className="container" style={{ color: 'white', flexDirection: 'column', gap: '20px', maxWidth: '900px', margin: '0 auto' }}>
+    <div className="container" style={{ color: 'white', flexDirection: 'column', gap: '16px', maxWidth: '860px', margin: '0 auto' }}>
 
       {/* Scoreboard */}
-      <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '8px', textAlign: 'center', position: 'relative' }}>
-        <h2>Innings {matchData.innings} | Over {matchData.overNumber}.{matchData.ballNumber} / {matchData.totalOvers}</h2>
-        <h1 style={{ color: 'var(--primary-color)' }}>{matchData.score} / {matchData.wickets}</h1>
-        {matchData.target && <p style={{ color: 'orange' }}>Target: {matchData.target} | Need {matchData.target - matchData.score} more</p>}
-        {matchData.processingResult && <p style={{ color: 'yellow', fontSize: '13px' }}>Evaluating ball...</p>}
-        <div style={{ position: 'absolute', top: '10px', right: '20px', background: 'rgba(0,0,0,0.5)', padding: '10px', borderRadius: '8px' }}>
-          <h3 style={{ margin: 0, color: timeLeft < 5 ? 'var(--error-color)' : 'white' }}>⏱ {timeLeft}s</h3>
+      <div style={{
+        background: pressure ? 'linear-gradient(135deg, #1a0a0a, #2d0a0a)' : 'var(--card-bg)',
+        border: pressure ? '1px solid rgba(239,68,68,0.4)' : '1px solid rgba(255,255,255,0.08)',
+        padding: '20px', borderRadius: '16px', textAlign: 'center', position: 'relative'
+      }}>
+        {pressure && <div style={{ position: 'absolute', top: '10px', left: '16px', color: '#ef4444', fontSize: '12px', fontWeight: 'bold', letterSpacing: '1px' }}>🔥 PRESSURE ZONE</div>}
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '4px' }}>
+          Innings {matchData.innings} · Over {matchData.overNumber}.{matchData.ballNumber} / {matchData.totalOvers}
         </div>
-      </div>
-
-      {/* Field Placement — only captain can set */}
-      {!fieldIsSet && amBowlingCaptain && (
-        <FieldSetter key="field-setter" current={null} onSave={saveFieldSettings} />
-      )}
-      {!fieldIsSet && !amBowlingCaptain && (
-        <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px', textAlign: 'center', color: 'orange' }}>
-          Waiting for bowling captain to set the field...
-        </div>
-      )}
-      {fieldIsSet && (
-        <div style={{ background: 'var(--card-bg)', padding: '10px 15px', borderRadius: '8px', display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
-          <span style={{ color: 'var(--success-color)', fontWeight: 'bold' }}>Field:</span>
-          {ZONES.map(z => (
-            <span key={z} style={{ fontSize: '13px', background: 'rgba(255,255,255,0.08)', padding: '3px 8px', borderRadius: '4px' }}>
-              {z.replace('-', ' ')}: <strong>{matchData.fieldSettings[z] || 0}</strong>
-            </span>
-          ))}
-          {amBowlingCaptain && (
-            <button
-              onClick={() => updateDoc(doc(db, 'matches', matchId), { fieldSettings: null })}
-              style={{ marginLeft: 'auto', fontSize: '12px', padding: '3px 10px', background: 'rgba(255,255,255,0.1)', border: 'none', color: 'white', borderRadius: '4px', cursor: 'pointer' }}
-            >
-              Reset Field
-            </button>
-          )}
-        </div>
-      )}
-
-      <div className="flex-row-responsive">
-        {/* Bowler Panel */}
-        <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>
-          <h3>Bowling</h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-            Bowler: <strong style={{ color: 'white' }}>{bowlerName}</strong>
-          </p>
-          {matchData.ballInput?.bowler ? (
-            <p style={{ color: 'var(--success-color)' }}>✓ Delivery Locked In</p>
-          ) : !fieldIsSet ? (
-            <p style={{ color: 'orange', fontSize: '13px' }}>Set field first</p>
-          ) : isMyTurnToBowl ? (
-            <form onSubmit={submitBowlingAction} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <select value={deliveryType} onChange={e => setDeliveryType(e.target.value)} className="input">
-                <option value="fast">Fast</option>
-                <option value="spin">Spin</option>
-                <option value="yorker">Yorker</option>
-                <option value="bouncer">Bouncer</option>
-              </select>
-              <select value={line} onChange={e => setLine(e.target.value)} className="input">
-                <option value="off">Off</option>
-                <option value="middle">Middle</option>
-                <option value="leg">Leg</option>
-              </select>
-              <button disabled={loading} type="submit" className="button primary">
-                {loading ? 'Submitting...' : 'Submit Delivery'}
-              </button>
-            </form>
-          ) : (
-            <p style={{ color: 'var(--text-secondary)' }}>Waiting for bowler...</p>
-          )}
-        </div>
-
-        {/* Batsman Panel */}
-        <div style={{ flex: 1, background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>
-          <h3>Batting</h3>
-          <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-            On Strike: <strong style={{ color: 'white' }}>{strikerName}</strong>
-          </p>
-          {matchData.ballInput?.batsman ? (
-            <p style={{ color: 'var(--success-color)' }}>✓ Shot Locked In</p>
-          ) : !fieldIsSet ? (
-            <p style={{ color: 'orange', fontSize: '13px' }}>Waiting for field to be set...</p>
-          ) : isMyTurnToBat ? (
-            <form onSubmit={submitBattingAction} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <select value={shotType} onChange={e => setShotType(e.target.value)} className="input">
-                <option value="drive">Drive</option>
-                <option value="cover drive">Cover Drive</option>
-                <option value="straight drive">Straight Drive</option>
-                <option value="pull">Pull</option>
-                <option value="cut">Cut</option>
-                <option value="sweep">Sweep</option>
-                <option value="scoop">Scoop / Ramp</option>
-                <option value="helicopter shot">Helicopter Shot</option>
-              </select>
-              <select value={intent} onChange={e => setIntent(e.target.value)} className="input">
-                <option value="attack">Attack</option>
-                <option value="neutral">Neutral</option>
-                <option value="defend">Defend</option>
-              </select>
-              <select value={batsmanDirection} onChange={e => setBatsmanDirection(e.target.value)} className="input">
-                <option value="off">Off Side</option>
-                <option value="straight">Straight</option>
-                <option value="leg">Leg Side</option>
-              </select>
-              <select value={batsmanLoft} onChange={e => setBatsmanLoft(e.target.value)} className="input">
-                <option value="ground">Along the Ground</option>
-                <option value="lofted">Lofted</option>
-              </select>
-              <button disabled={loading} type="submit" className="button primary">
-                {loading ? 'Submitting...' : 'Submit Shot'}
-              </button>
-            </form>
-          ) : (
-            <p style={{ color: 'var(--text-secondary)' }}>Waiting for batsman...</p>
-          )}
-        </div>
-      </div>
-
-      {/* Cinematic Preview Panel */}
-      {(isMyTurnToBat || isMyTurnToBowl) && fieldIsSet && !matchData.processingResult && (
-        <ActionCinematicPanel 
-          type={isMyTurnToBat ? 'batting' : 'bowling'}
-          choiceObj={
-            isMyTurnToBat 
-              ? (matchData.ballInput?.batsman || { shotType, intent, direction: batsmanDirection, loft: batsmanLoft })
-              : (matchData.ballInput?.bowler || { deliveryType, line })
-          }
-          isSubmitted={isMyTurnToBat ? !!matchData.ballInput?.batsman : !!matchData.ballInput?.bowler}
-        />
-      )}
-
-      {/* Commentary */}
-      <div style={{ background: 'var(--card-bg)', padding: '15px', borderRadius: '8px' }}>
-        <h3 style={{ borderBottom: '1px solid gray', paddingBottom: '10px', marginBottom: '10px' }}>Last Delivery</h3>
-        {matchData.history?.length > 0 ? (
-          <div style={{ fontSize: '16px' }}>
-            <span style={{ color: 'var(--primary-color)', fontWeight: 'bold' }}>
-              [{matchData.overNumber}.{matchData.ballNumber === 0 ? 6 : matchData.ballNumber}]
-            </span>{' '}
-            {matchData.history[matchData.history.length - 1].commentary}
+        <div style={{ fontSize: '42px', fontWeight: 'bold', lineHeight: 1 }}>{matchData.score}<span style={{ fontSize: '24px', opacity: 0.6 }}>/{matchData.wickets}</span></div>
+        <div style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px' }}>{battingTeamName} batting</div>
+        {matchData.target && (
+          <div style={{ marginTop: '8px', padding: '6px 14px', background: 'rgba(251,191,36,0.15)', borderRadius: '20px', display: 'inline-block', color: '#fbbf24', fontSize: '14px' }}>
+            Need {matchData.target - matchData.score} off {(matchData.totalOvers - matchData.overNumber) * 6 - matchData.ballNumber} balls
           </div>
-        ) : (
-          <p style={{ color: 'var(--text-secondary)' }}>No deliveries yet.</p>
         )}
+        <div style={{ position: 'absolute', top: '12px', right: '16px', background: 'rgba(0,0,0,0.4)', padding: '8px 12px', borderRadius: '8px' }}>
+          <span style={{ color: timerColor, fontWeight: 'bold', fontSize: '18px' }}>⏱ {timeLeft}s</span>
+        </div>
       </div>
+
+      {/* Players on field */}
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <div style={{ flex: 1, background: 'var(--card-bg)', padding: '12px 16px', borderRadius: '10px', fontSize: '13px' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>🏏 On Strike</div>
+          <div style={{ fontWeight: 'bold' }}>{strikerName}</div>
+        </div>
+        <div style={{ flex: 1, background: 'var(--card-bg)', padding: '12px 16px', borderRadius: '10px', fontSize: '13px' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>🏃 Non-Striker</div>
+          <div style={{ fontWeight: 'bold' }}>{nonStrikerName || '—'}</div>
+        </div>
+        <div style={{ flex: 1, background: 'var(--card-bg)', padding: '12px 16px', borderRadius: '10px', fontSize: '13px' }}>
+          <div style={{ color: 'var(--text-secondary)', marginBottom: '4px' }}>🎳 Bowler</div>
+          <div style={{ fontWeight: 'bold' }}>{bowlerName}</div>
+        </div>
+      </div>
+
+      {/* Last result reveal */}
+      {lastResult && <RevealPanel result={lastResult} />}
+
+      {/* Both locked — waiting for engine */}
+      {bothLocked && !lastResult && (
+        <div style={{ background: 'var(--card-bg)', padding: '20px', borderRadius: '12px', textAlign: 'center', color: '#fbbf24' }}>
+          ⚡ Both decisions locked — revealing outcome...
+        </div>
+      )}
+
+      {/* Action panels */}
+      {!bothLocked && (
+        <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
+
+          {/* Bowling panel */}
+          <div style={{ flex: 1, minWidth: '280px', background: 'var(--card-bg)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0 }}>🎳 {bowlingTeamName}</h3>
+              {matchData.ballInput?.bowler && <span style={{ color: 'var(--success-color)', fontSize: '13px' }}>✓ Locked</span>}
+            </div>
+            {matchData.ballInput?.bowler ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--success-color)' }}>
+                <div style={{ fontSize: '32px' }}>🔒</div>
+                <div>Delivery locked in — waiting for batsman</div>
+              </div>
+            ) : isMyTurnToBowl ? (
+              <>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>Choose your bowling style:</p>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                  {BOWL_STYLES.map(s => (
+                    <StyleButton key={s.value} style={s} selected={selectedStyle === s.value} onSelect={setSelectedStyle} disabled={loading} />
+                  ))}
+                </div>
+                <button onClick={submitBowling} disabled={!selectedStyle || loading} className="button primary">
+                  {loading ? 'Locking...' : 'Lock Delivery 🔒'}
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>⏳</div>
+                Waiting for {bowlerName}...
+              </div>
+            )}
+          </div>
+
+          {/* Batting panel */}
+          <div style={{ flex: 1, minWidth: '280px', background: 'var(--card-bg)', padding: '16px', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.08)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+              <h3 style={{ margin: 0 }}>🏏 {battingTeamName}</h3>
+              {matchData.ballInput?.batsman && <span style={{ color: 'var(--success-color)', fontSize: '13px' }}>✓ Locked</span>}
+            </div>
+            {matchData.ballInput?.batsman ? (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--success-color)' }}>
+                <div style={{ fontSize: '32px' }}>🔒</div>
+                <div>Shot locked in — waiting for bowler</div>
+              </div>
+            ) : isMyTurnToBat ? (
+              <>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px' }}>Choose your run attempt:</p>
+                <div style={{ display: 'flex', gap: '6px', marginBottom: '14px', flexWrap: 'wrap' }}>
+                  {RUN_CARDS.map(c => (
+                    <CardButton key={c.value} card={c} selected={selectedRun === c.value} onSelect={setSelectedRun} disabled={loading} />
+                  ))}
+                </div>
+                <button onClick={submitBatting} disabled={selectedRun === null || loading} className="button primary">
+                  {loading ? 'Locking...' : 'Lock Shot 🔒'}
+                </button>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '20px', color: 'var(--text-secondary)' }}>
+                <div style={{ fontSize: '32px', marginBottom: '8px' }}>⏳</div>
+                Waiting for {strikerName}...
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Commentary history */}
+      {matchData.history?.length > 0 && (
+        <div style={{ background: 'var(--card-bg)', padding: '14px 16px', borderRadius: '12px' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '1px' }}>Recent Balls</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            {[...matchData.history].reverse().slice(0, 5).map((h, i) => (
+              <div key={i} style={{ fontSize: '13px', display: 'flex', gap: '10px', alignItems: 'center', padding: '4px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <span style={{
+                  minWidth: '28px', textAlign: 'center', fontWeight: 'bold',
+                  color: h.isWicket ? '#ef4444' : h.runs === 6 ? '#a78bfa' : h.runs === 4 ? '#fbbf24' : h.runs === 0 ? '#64748b' : '#10b981'
+                }}>
+                  {h.isWicket ? 'W' : h.runs}
+                </span>
+                <span style={{ color: 'var(--text-secondary)' }}>{h.commentary}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div style={{ textAlign: 'center' }}>
-        <button onClick={leaveLobby} className="button secondary" style={{ maxWidth: '200px' }}>Leave Match</button>
+        <button onClick={leaveLobby} className="button secondary" style={{ maxWidth: '180px' }}>Leave Match</button>
       </div>
     </div>
   );

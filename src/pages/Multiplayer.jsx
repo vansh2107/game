@@ -308,29 +308,32 @@ function LobbyRoom({ lobbyId, lobbyData, leaveLobby }) {
     if (!isHost) return;
     if (!isValidTeams) return alert('Teams must have an equal number of players');
     if (!isAllReady) return alert('All players must be ready');
+    // Each team must have a captain
+    const capA = teamA.find(p => p.isCaptain);
+    const capB = teamB.find(p => p.isCaptain);
+    if (!capA) return alert('Team A needs a captain');
+    if (!capB) return alert('Team B needs a captain');
 
     const teamAIds = teamA.map(p => p.uid);
     const teamBIds = teamB.map(p => p.uid);
-    const tossWinnerTeam = Math.random() > 0.5 ? 'A' : 'B';
 
-    // Toss: Team A's captain always calls. Coin result revealed after call.
     await setDoc(doc(db, 'matches', lobbyId), {
       status: 'toss',
       matchVersion: ENGINE_CONFIG.VERSION,
-      tossCallerTeam: 'A',   // Team A captain makes the call
-      tossCall: null,         // 'heads' or 'tails' — set when caller picks
-      tossCoinResult: null,   // actual flip result — revealed after call
-      tossWinnerTeam: null,   // derived after flip
-      tossChoice: null,       // 'bat' or 'bowl' — set by winner
+      tossCallerTeam: 'A',
+      tossCall: null,
+      tossCoinResult: null,
+      tossWinnerTeam: null,
+      tossChoice: null,
       totalOvers: lobbyData.overs,
       lastManStand: !!lobbyData.lastManStand,
       teamLists: { A: teamAIds, B: teamBIds },
       ballInput: { bowler: null, batsman: null },
       history: [],
+      lastResult: null,
       outPlayers: [],
       lastOverBowlerId: null,
       processingResult: false,
-      fieldSettings: null,
       consecSixes: 0,
       consecWickets: 0
     });
