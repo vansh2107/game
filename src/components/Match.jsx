@@ -8,8 +8,10 @@ export const ENGINE_CONFIG = {
   VERSION: '2.1.0',
   CONSECUTIVE_LIMIT: 2,
   PRESSURE_OVERS: 2,
-  REVEAL_DELAY_MS: 700,   // pause before showing result
-  NEXT_BALL_DELAY_MS: 2500, // pause after result before clearing
+  REVEAL_DELAY_MS: 800,    // pause before showing result
+  NEXT_BALL_DELAY_MS: 3000,  // pause after result before clearing
+  STUCK_RECOVERY_MS: 4000,   // auto-unlock if processing hangs
+  INNINGS_BREAK_MS: 7000,    // time to read target
 };
 
 // ─── RUN CARDS — cricket-themed ──────────────────────────────────────────────
@@ -262,21 +264,21 @@ function RevealPanel({ result }) {
   if (!result) return null;
 
   const cfg = {
-    wicket:   { bg: 'linear-gradient(135deg, #7f0000, #D32F2F)', icon: '☝️', accent: '#FFEBEE', label: 'WICKET!',   anim: 'anim-wicket' },
-    six:      { bg: 'linear-gradient(135deg, #FFD700, #FFA000)', icon: '💥', accent: '#FFFFFF', label: 'SIX!',      anim: 'anim-six' },
-    boundary: { bg: 'linear-gradient(135deg, #FB8C00, #E65100)', icon: '🔥', accent: '#FFF3E0', label: 'FOUR!',     anim: 'anim-fadein' },
-    dot:      { bg: 'linear-gradient(135deg, #455A64, #78909C)', icon: '🛡️', accent: '#CFD8DC', label: 'DOT BALL',  anim: 'anim-dot' },
-    runs:     { bg: 'linear-gradient(135deg, #2E7D32, #1B5E20)', icon: '⚡', accent: '#C8E6C9', label: `${result.runs} RUN${result.runs !== 1 ? 'S' : ''}`, anim: 'anim-fadein' },
-  }[result.resultType] || { bg: '#263238', icon: '⚡', accent: '#90A4AE', label: '...', anim: '' };
+    wicket:   { bg: 'linear-gradient(135deg, #b71c1c, #d32f2f)', icon: '☝️', accent: '#ffcdd2', label: 'WICKET!',   anim: 'anim-wicket', shadow: 'rgba(211, 47, 47, 0.6)' },
+    six:      { bg: 'linear-gradient(135deg, #fbc02d, #f9a825)', icon: '🚀', accent: '#fff9c4', label: 'MAXIMUM!',  anim: 'anim-six', shadow: 'rgba(255, 215, 0, 0.6)' },
+    boundary: { bg: 'linear-gradient(135deg, #e65100, #fb8c00)', icon: '🔥', accent: '#ffe0b2', label: 'FOUR!',     anim: 'anim-fadein', shadow: 'rgba(251, 140, 0, 0.5)' },
+    dot:      { bg: 'linear-gradient(135deg, #37474f, #455a64)', icon: '🛡️', accent: '#cfd8dc', label: 'DOT BALL',  anim: 'anim-dot', shadow: 'rgba(0,0,0,0.3)' },
+    runs:     { bg: 'linear-gradient(135deg, #1b5e20, #2e7d32)', icon: '⚡', accent: '#c8e6c9', label: `${result.runs} RUNS`, anim: 'anim-fadein', shadow: 'rgba(46, 125, 50, 0.4)' },
+  }[result.resultType] || { bg: '#263238', icon: '⚡', accent: '#90A4AE', label: '...', anim: '', shadow: 'transparent' };
 
   const bowlCard = BOWL_STYLES.find(s => s.value === result.bowlStyle);
   const runCard  = RUN_CARDS.find(c => c.value === result.runAttempt);
 
   return (
     <div className={`anim-slideup ${phase === 'show' ? cfg.anim : ''}`} style={{
-      background: cfg.bg, border: `1px solid ${cfg.accent}55`, borderRadius: '12px',
-      padding: '22px', textAlign: 'center',
-      boxShadow: `0 8px 32px rgba(0,0,0,0.4), 0 0 0 1px ${cfg.accent}22`,
+      background: cfg.bg, border: `2px solid ${cfg.accent}88`, borderRadius: '16px',
+      padding: '28px', textAlign: 'center',
+      boxShadow: `0 12px 48px rgba(0,0,0,0.5), 0 0 30px ${cfg.shadow}`,
     }}>
       {/* Choices revealed after delay */}
       {phase === 'show' && bowlCard && runCard && (
@@ -346,10 +348,20 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
   // Timer — resets only on new ball, not every snapshot
   useEffect(() => {
     if (!matchData || matchData.status !== 'in-progress') return;
-    if (matchData.ballInput?.bowler && matchData.ballInput?.batsman) return;
+    if (matchData.processingResult) return; // Don't reset timer while processing
+    
     const key = `${matchData.innings}-${matchData.overNumber}-${matchData.ballNumber}`;
     if (timerBallRef.current === key) return;
     timerBallRef.current = key;
+
+    // DEBUG state at ball start
+    console.log(`[Ball Start] ${key}`, {
+      ballInput: matchData.ballInput,
+      processingResult: matchData.processingResult,
+      score: matchData.score,
+      wickets: matchData.wickets
+    });
+
     setTimeLeft(ENGINE_CONFIG.TURN_TIMER_SEC);
     setLastResult(null);
     setActionsReady(true);
@@ -403,10 +415,16 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
     if (matchData.ballInput?.bowler && matchData.ballInput?.batsman) processBall(matchData);
   }, [matchData]);
 
-  // Deadlock recovery
+  // Deadlock recovery — shorter timeout per requirements
   useEffect(() => {
     if (!matchData || !imHost || !matchData.processingResult) return;
-    const t = setTimeout(() => updateDoc(doc(db, 'matches', matchId), { processingResult: false, ballInput: { bowler: null, batsman: null } }), 20000);
+    const t = setTimeout(() => {
+      console.warn("[Match Engine] STUCK DETECTED — forcing state reset");
+      updateDoc(doc(db, 'matches', matchId), { 
+        processingResult: false, 
+        ballInput: { bowler: null, batsman: null } 
+      });
+    }, ENGINE_CONFIG.STUCK_RECOVERY_MS);
     return () => clearTimeout(t);
   }, [matchData?.processingResult]);
 
@@ -543,8 +561,8 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
         consecSixes: 0, consecWickets: 0, processingResult: false,
         lastOverBowlerId: null,
       });
-      // Auto-transition to in-progress after 5s
-      setTimeout(() => updateDoc(doc(db, 'matches', matchId), { status: 'in-progress' }), 5000);
+      // Auto-transition to in-progress after delay
+      setTimeout(() => updateDoc(doc(db, 'matches', matchId), { status: 'in-progress', processingResult: false, ballInput: { bowler: null, batsman: null } }), ENGINE_CONFIG.INNINGS_BREAK_MS);
       return;
     }
 
@@ -567,6 +585,9 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       }); return;
     }
 
+    // GUARANTEE CLEAN STATE after ball — exactly 1 second delay as requested
+    await new Promise(r => setTimeout(r, 1000));
+
     await updateDoc(doc(db, 'matches', matchId), {
       score: nextScore, wickets: nextWickets, ballNumber: nextBall, overNumber: nextOver,
       strikerId: nextStriker, nonStrikerId: swappedNonStriker,
@@ -581,7 +602,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   async function submitBowling() {
     if (!selectedStyle || loading || !matchData) return;
-    if (matchData.currentBowlerId !== currentUser?.uid || matchData.ballInput?.bowler) return;
+    if (matchData.currentBowlerId !== currentUser?.uid || matchData.ballInput?.bowler || matchData.processingResult) return;
     try {
       setLoading(true);
       await updateDoc(doc(db, 'matches', matchId), { 'ballInput.bowler': { style: selectedStyle, submittedBy: currentUser.uid } });
@@ -595,7 +616,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
 
   async function submitBatting() {
     if (selectedRun === null || loading || !matchData) return;
-    if (matchData.strikerId !== currentUser?.uid || matchData.ballInput?.batsman) return;
+    if (matchData.strikerId !== currentUser?.uid || matchData.ballInput?.batsman || matchData.processingResult) return;
     try {
       setLoading(true);
       await updateDoc(doc(db, 'matches', matchId), { 'ballInput.batsman': { runAttempt: selectedRun, submittedBy: currentUser.uid } });
@@ -669,7 +690,7 @@ export default function Match({ lobbyData, matchId, leaveLobby }) {
       console.log(`[Match Debug] UID: ${currentUser?.uid}, Striker: ${matchData.strikerId}, Bowler: ${matchData.currentBowlerId}`);
     }
   }, [matchData?.strikerId, matchData?.currentBowlerId, matchData?.status]);
-  const bothLocked     = !!(matchData.ballInput?.bowler && matchData.ballInput?.batsman);
+  const bothLocked     = matchData.processingResult === true;
   const teamAName      = lobbyData?.teamAName || 'Team A';
   const teamBName      = lobbyData?.teamBName || 'Team B';
   const battingTeamName  = matchData.battingTeam  === 'A' ? teamAName : teamBName;

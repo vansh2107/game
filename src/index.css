@@ -326,33 +326,33 @@ select.input {
 }
 
 @keyframes wicketShake {
-  0%,100% { transform: translateX(0); }
-  20%     { transform: translateX(-6px) rotate(-1deg); }
-  40%     { transform: translateX(6px)  rotate(1deg); }
-  60%     { transform: translateX(-4px); }
-  80%     { transform: translateX(4px); }
+  0%, 100% { transform: translateX(0) scale(1); filter: brightness(1); }
+  20% { transform: translateX(-10px) rotate(-2deg) scale(1.05); filter: brightness(1.2); }
+  40% { transform: translateX(10px) rotate(2deg) scale(1.05); }
+  60% { transform: translateX(-8px) rotate(-1deg); }
+  80% { transform: translateX(8px) rotate(1deg); }
 }
 
 @keyframes sixGlow {
-  0%,100% { box-shadow: 0 0 20px rgba(255,215,0,0.3); }
-  50%     { box-shadow: 0 0 50px rgba(255,215,0,0.7); }
+  0%, 100% { transform: scale(1); box-shadow: 0 0 20px rgba(255,215,0,0.3), inset 0 0 10px rgba(255,255,255,0.2); }
+  50% { transform: scale(1.03); box-shadow: 0 0 60px rgba(255,215,0,0.8), inset 0 0 20px rgba(255,255,255,0.4); }
 }
 
 @keyframes dotFade {
-  from { opacity: 0.4; }
-  to   { opacity: 1; }
+  0% { opacity: 0.5; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(16px); }
-  to   { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translateY(30px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-.anim-wicket { animation: wicketShake 0.5s ease; }
-.anim-six    { animation: sixGlow 1s ease infinite; }
-.anim-dot    { animation: dotFade 0.4s ease; }
-.anim-fadein { animation: fadeIn 0.3s ease; }
-.anim-slideup{ animation: slideUp 0.35s ease; }
+.anim-wicket { animation: wicketShake 0.6s cubic-bezier(.36,.07,.19,.97) both; }
+.anim-six    { animation: sixGlow 1.2s ease-in-out infinite; }
+.anim-dot    { animation: dotFade 0.4s ease-out; }
+.anim-fadein { animation: fadeIn 0.4s ease-out; }
+.anim-slideup{ animation: slideUp 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) both; }
 
 /* ─── RESPONSIVE ────────────────────────────────────────────────────────────── */
 @media (max-width: 768px) {
